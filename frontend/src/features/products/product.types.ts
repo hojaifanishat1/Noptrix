@@ -6,6 +6,8 @@ export type ProductStatus =
   | "INACTIVE"
   | "ARCHIVED";
 
+export type ProductVisibility = "VISIBLE" | "HIDDEN";
+
 export type InventoryPolicy = "DENY" | "CONTINUE";
 
 export interface ProductSEO {
@@ -39,6 +41,9 @@ export interface Product {
   shortDescription?: string;
   type: ProductType;
   status: ProductStatus;
+  visibility?: ProductVisibility;
+  publishAt?: string | null;
+  publishedAt?: string;
   sku?: string;
   barcode?: string;
   sellerId?: string;
@@ -49,6 +54,9 @@ export interface Product {
   price: number;
   compareAtPrice?: number;
   costPrice?: number;
+  salePrice?: number;
+  saleStartsAt?: string | null;
+  saleEndsAt?: string | null;
   currency?: string;
   trackInventory?: boolean;
   stockQuantity?: number;
@@ -73,6 +81,8 @@ export interface ProductInput {
   shortDescription?: string;
   type?: ProductType;
   status?: ProductStatus;
+  visibility?: ProductVisibility;
+  publishAt?: string | null;
   sku?: string;
   barcode?: string;
   sellerId?: string;
@@ -80,14 +90,19 @@ export interface ProductInput {
   subcategoryId?: string;
   brandId?: string;
   collectionIds?: string[];
+  tagIds?: string[];
   price: number;
   compareAtPrice?: number;
   costPrice?: number;
+  salePrice?: number | null;
+  saleStartsAt?: string | null;
+  saleEndsAt?: string | null;
   currency?: string;
   trackInventory?: boolean;
   stockQuantity?: number;
   lowStockThreshold?: number;
   inventoryPolicy?: InventoryPolicy;
+  inventoryWarehouseId?: string;
   requiresShipping?: boolean;
   shipping?: ProductShipping;
   tags?: string[];

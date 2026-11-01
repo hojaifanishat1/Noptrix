@@ -4,12 +4,19 @@ import { ApiResponse } from "../../utils/ApiResponse";
 import * as service from "./tag.service";
 
 export const listTagsController = asyncHandler(
-  async (_req: Request, res: Response) => {
+  async (req: Request, res: Response) => {
     res
       .status(200)
       .json(
         ApiResponse.ok(
-          await service.listProductTags(),
+          await service.listProductTags({
+            page: Number(req.query.page ?? 1),
+            limit: Number(req.query.limit ?? 20),
+            search:
+              typeof req.query.search === "string"
+                ? req.query.search
+                : undefined,
+          }),
           "Product tags retrieved successfully.",
         ).serialize(),
       );

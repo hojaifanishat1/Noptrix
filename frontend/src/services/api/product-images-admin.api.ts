@@ -7,9 +7,18 @@ import type {
   ProductImage,
   ProductImageListResult,
   ProductListResult,
+  VariableProduct,
 } from "@/features/product-images/image.types";
 
 export const productImagesAdminApi = {
+  async getProduct(productId: string): Promise<VariableProduct> {
+    const response = await apiClient.get<ApiResponse<VariableProduct>>(
+      `/products/${productId}`,
+    );
+
+    return response.data.data;
+  },
+
   async getProducts(): Promise<ProductListResult> {
     const response = await apiClient.get<ApiResponse<ProductListResult>>(
       "/products",

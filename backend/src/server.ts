@@ -39,6 +39,11 @@ import {
   stopNotificationWorker,
 } from "./jobs/notification.worker";
 
+import {
+  startProductPublishWorker,
+  stopProductPublishWorker,
+} from "./jobs/product-publish.worker";
+
 /*
 |--------------------------------------------------------------------------
 | HTTP Server
@@ -133,6 +138,16 @@ const gracefulShutdown = async (signal: string): Promise<void> => {
           error,
         },
         "Announcement worker shutdown failed.",
+      );
+    }
+
+    try {
+      await stopProductPublishWorker();
+      logger.info("Product publish worker stopped.");
+    } catch (error) {
+      logger.error(
+        { error },
+        "Product publish worker shutdown failed.",
       );
     }
 
@@ -244,6 +259,7 @@ const bootstrap = async (): Promise<void> => {
         */
 
     startAnnouncementWorker();
+    await startProductPublishWorker();
 
     logger.info("Announcement worker started.");
 
@@ -355,6 +371,16 @@ const bootstrap = async (): Promise<void> => {
           error: shutdownError,
         },
         "Announcement worker cleanup failed after startup error.",
+      );
+    }
+
+    try {
+      await stopProductPublishWorker();
+      logger.info("Product publish worker cleanup completed.");
+    } catch (shutdownError) {
+      logger.error(
+        { error: shutdownError },
+        "Product publish worker cleanup failed after startup error.",
       );
     }
 

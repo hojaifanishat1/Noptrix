@@ -51,9 +51,8 @@ router.get(
   requirePermission("broadcast.read"),
   async (req: Request, res: Response) => {
     try {
-      const data = await getBroadcastCampaignDetails(
-        req.params.broadcastId,
-      );
+      const broadcastId = String(req.params.broadcastId);
+      const data = await getBroadcastCampaignDetails(broadcastId);
 
       res.json({ success: true, data });
     } catch (error) {

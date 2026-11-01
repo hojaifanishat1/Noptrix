@@ -122,6 +122,22 @@ export async function listInventory(filters: InventoryListFilters) {
   };
 }
 
+export async function getInventoryReferences(id: string) {
+  assertObjectId(id);
+
+  const item = await InventoryModel.findById(id)
+    .select("productId warehouseId")
+    .lean()
+    .exec();
+
+  if (!item) throw ApiError.notFound("Inventory record not found.");
+
+  return {
+    productId: item.productId.toString(),
+    warehouseId: item.warehouseId.toString(),
+  };
+}
+
 export async function getInventory(id: string) {
   assertObjectId(id);
 

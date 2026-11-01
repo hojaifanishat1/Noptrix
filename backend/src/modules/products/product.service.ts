@@ -2,6 +2,11 @@ import mongoose, { Types } from "mongoose";
 
 import { ApiError } from "../../utils/ApiError";
 import ProductModel, { type ProductDocument } from "./product.model";
+import InventoryModel from "../inventory/inventory.model";
+import WarehouseModel from "../warehouses/warehouse.model";
+import StockMovementModel from "../stock-movements/stockMovement.model";
+import { ProductTag } from "../product-tags/tag.model";
+import { ProductTagAssignment } from "../product-tags/product-tag-assignment.model";
 
 import type {
   ProductInput,
@@ -135,6 +140,7 @@ function validateProductRules(input: Partial<ProductInput>): void {
 }
 
 export async function createProduct(input: ProductInput, actorId?: string) {
+  const { inventoryWarehouseId, tagIds = [], ...productInput } = input;
   const name = input.name.trim();
   const slug = normalizeSlug(input.slug || name);
 
@@ -143,13 +149,45 @@ export async function createProduct(input: ProductInput, actorId?: string) {
   }
 
   validatePriceRelationship(input.price, input.compareAtPrice);
+  if (
+    input.salePrice !== undefined &&
+    input.salePrice !== null &&
+    input.salePrice >= input.price
+  ) {
+    throw ApiError.badRequest(
+      "Sale price must be less than the regular price.",
+    );
+  }
+  if (
+    input.saleStartsAt &&
+    input.saleEndsAt &&
+    input.saleStartsAt >= input.saleEndsAt
+  ) {
+    throw ApiError.badRequest(
+      "Sale end time must be later than its start time.",
+    );
+  }
+  if (input.publishAt && input.publishAt <= new Date()) {
+    throw ApiError.badRequest("Scheduled publish time must be in the future.");
+  }
+  if (input.publishAt && input.status === "INACTIVE") {
+    throw ApiError.badRequest(
+      "An inactive product cannot be scheduled for publication.",
+    );
+  }
   validateProductRules(input);
   await assertReferencesExist(input);
 
   const payload: Record<string, unknown> = {
-    ...input,
+    ...productInput,
     name,
     slug,
+    status:
+      input.publishAt && input.publishAt > new Date()
+        ? "DRAFT"
+        : (input.status ?? "DRAFT"),
+    publishedAt:
+      !input.publishAt && input.status === "ACTIVE" ? new Date() : undefined,
     sku: normalizeSku(input.sku),
     barcode: normalizeBarcode(input.barcode),
     tags: [...new Set((input.tags ?? []).map((tag) => tag.trim()))],
@@ -166,6 +204,45 @@ export async function createProduct(input: ProductInput, actorId?: string) {
 
   try {
     await session.withTransaction(async () => {
+      let warehouseId: Types.ObjectId | undefined;
+      let stockMovementActorId: Types.ObjectId | undefined;
+
+      if (inventoryWarehouseId) {
+        if (input.trackInventory === false) {
+          throw ApiError.badRequest(
+            "Inventory warehouse cannot be set when inventory tracking is disabled.",
+          );
+        }
+
+        if (!Types.ObjectId.isValid(inventoryWarehouseId)) {
+          throw ApiError.badRequest("Invalid inventory warehouse ID.");
+        }
+
+        const warehouse = await WarehouseModel.findOne({
+          _id: inventoryWarehouseId,
+          status: "ACTIVE",
+        })
+          .select("_id")
+          .session(session)
+          .lean()
+          .exec();
+
+        if (!warehouse) {
+          throw ApiError.badRequest(
+            "Select an active warehouse for this product.",
+          );
+        }
+
+        if (!actorId || !Types.ObjectId.isValid(actorId)) {
+          throw ApiError.unauthorized(
+            "Authenticated admin ID is required to initialize inventory.",
+          );
+        }
+
+        warehouseId = warehouse._id;
+        stockMovementActorId = new Types.ObjectId(actorId);
+      }
+
       const created = await ProductModel.create([payload], { session });
       const product = created[0];
 
@@ -183,6 +260,64 @@ export async function createProduct(input: ProductInput, actorId?: string) {
             { session },
           )
           .exec();
+      }
+
+      if (warehouseId) {
+        const initialQuantity = product.stockQuantity;
+
+        await InventoryModel.create(
+          [
+            {
+              productId: product._id,
+              warehouseId,
+              quantity: initialQuantity,
+              reservedQuantity: 0,
+              lowStockThreshold: product.lowStockThreshold,
+            },
+          ],
+          { session },
+        );
+
+        if (initialQuantity > 0 && stockMovementActorId) {
+          await StockMovementModel.create(
+            [
+              {
+                productId: product._id,
+                warehouseId,
+                type: "IN",
+                quantity: initialQuantity,
+                quantityBefore: 0,
+                quantityAfter: initialQuantity,
+                reason: "Initial stock received during product creation.",
+                referenceType: "PRODUCT_CREATION",
+                referenceId: product._id,
+                createdBy: stockMovementActorId,
+              },
+            ],
+            { session },
+          );
+        }
+      }
+
+      const uniqueTagIds = [...new Set(tagIds)];
+      if (uniqueTagIds.length > 0) {
+        const existingTagCount = await ProductTag.countDocuments({
+          _id: { $in: uniqueTagIds },
+        })
+          .session(session)
+          .exec();
+
+        if (existingTagCount !== uniqueTagIds.length) {
+          throw ApiError.badRequest("One or more product tags do not exist.");
+        }
+
+        await ProductTagAssignment.insertMany(
+          uniqueTagIds.map((tagId) => ({
+            productId: product._id,
+            tagId: new Types.ObjectId(tagId),
+          })),
+          { session },
+        );
       }
 
       createdProduct = product;
@@ -236,13 +371,28 @@ export async function getProductBySlug(
 ) {
   const query = ProductModel.findOne({
     slug: normalizeSlug(slug),
-    ...(options.includeArchived ? {} : { status: "ACTIVE" }),
+    ...(options.includeArchived
+      ? {}
+      : {
+          status: "ACTIVE",
+          $or: [{ visibility: "VISIBLE" }, { visibility: { $exists: false } }],
+        }),
   });
 
   const product = await query;
 
   if (!product) {
     throw ApiError.notFound("Product not found.");
+  }
+
+  const now = new Date();
+  if (
+    product.salePrice !== undefined &&
+    (!product.saleStartsAt || product.saleStartsAt <= now) &&
+    (!product.saleEndsAt || product.saleEndsAt > now)
+  ) {
+    product.compareAtPrice = product.price;
+    product.price = product.salePrice;
   }
 
   return product;
@@ -310,6 +460,18 @@ export async function listProducts(
     ];
   }
 
+  if (options.publicOnly) {
+    const conditions = Array.isArray(filter.$and)
+      ? (filter.$and as Record<string, unknown>[])
+      : [];
+    filter.$and = [
+      ...conditions,
+      {
+        $or: [{ visibility: "VISIBLE" }, { visibility: { $exists: false } }],
+      },
+    ];
+  }
+
   const allowedSortFields = [
     "createdAt",
     "updatedAt",
@@ -344,7 +506,23 @@ export async function listProducts(
   const totalPages = Math.ceil(total / limit);
 
   return {
-    items,
+    items: options.publicOnly
+      ? items.map((item) => {
+          const now = new Date();
+          if (
+            item.salePrice !== undefined &&
+            (!item.saleStartsAt || item.saleStartsAt <= now) &&
+            (!item.saleEndsAt || item.saleEndsAt > now)
+          ) {
+            return {
+              ...item,
+              compareAtPrice: item.price,
+              price: item.salePrice,
+            };
+          }
+          return item;
+        })
+      : items,
     pagination: {
       page,
       limit,
@@ -361,6 +539,7 @@ export async function updateProduct(
   input: ProductUpdateInput,
   actorId?: string,
 ) {
+  const { tagIds, ...productInput } = input;
   const product = await getProductById(id, {
     includeArchived: true,
   });
@@ -369,31 +548,70 @@ export async function updateProduct(
     throw ApiError.conflict("Archived products cannot be edited.");
   }
 
-  const nextPrice = input.price ?? product.price;
+  const nextPrice = productInput.price ?? product.price;
   const nextCompareAt =
-    input.compareAtPrice !== undefined
-      ? input.compareAtPrice
+    productInput.compareAtPrice !== undefined
+      ? productInput.compareAtPrice
       : product.compareAtPrice;
 
   validatePriceRelationship(nextPrice, nextCompareAt);
 
+  const nextSalePrice =
+    productInput.salePrice !== undefined
+      ? productInput.salePrice
+      : product.salePrice;
+  const nextSaleStart =
+    productInput.saleStartsAt !== undefined
+      ? productInput.saleStartsAt
+      : product.saleStartsAt;
+  const nextSaleEnd =
+    productInput.saleEndsAt !== undefined
+      ? productInput.saleEndsAt
+      : product.saleEndsAt;
+
+  if (
+    nextSalePrice !== undefined &&
+    nextSalePrice !== null &&
+    nextSalePrice >= nextPrice
+  ) {
+    throw ApiError.badRequest(
+      "Sale price must be less than the regular price.",
+    );
+  }
+  if (nextSaleStart && nextSaleEnd && nextSaleStart >= nextSaleEnd) {
+    throw ApiError.badRequest(
+      "Sale end time must be later than its start time.",
+    );
+  }
+  if (productInput.publishAt && productInput.publishAt <= new Date()) {
+    throw ApiError.badRequest("Scheduled publish time must be in the future.");
+  }
+  if (
+    productInput.publishAt &&
+    (productInput.status ?? product.status) === "INACTIVE"
+  ) {
+    throw ApiError.badRequest(
+      "An inactive product cannot be scheduled for publication.",
+    );
+  }
+
   validateProductRules({
-    type: input.type ?? product.type,
-    requiresShipping: input.requiresShipping ?? product.requiresShipping,
+    type: productInput.type ?? product.type,
+    requiresShipping: productInput.requiresShipping ?? product.requiresShipping,
   });
 
-  const nextCategoryId = input.categoryId ?? String(product.categoryId);
+  const nextCategoryId = productInput.categoryId ?? String(product.categoryId);
 
   const nextSubcategoryId =
-    input.subcategoryId !== undefined
-      ? input.subcategoryId
+    productInput.subcategoryId !== undefined
+      ? productInput.subcategoryId
       : product.subcategoryId
         ? String(product.subcategoryId)
         : undefined;
 
   const nextBrandId =
-    input.brandId !== undefined
-      ? input.brandId
+    productInput.brandId !== undefined
+      ? productInput.brandId
       : product.brandId
         ? String(product.brandId)
         : undefined;
@@ -402,35 +620,48 @@ export async function updateProduct(
     categoryId: nextCategoryId,
     subcategoryId: nextSubcategoryId,
     brandId: nextBrandId,
-    collectionIds: input.collectionIds,
+    collectionIds: productInput.collectionIds,
   });
 
-  const updates: Record<string, unknown> = { ...input };
+  const updates: Record<string, unknown> = { ...productInput };
 
-  if (input.name && input.slug === undefined) {
-    updates.slug = normalizeSlug(input.name);
-  } else if (input.slug !== undefined) {
-    updates.slug = normalizeSlug(input.slug);
+  if (productInput.publishAt && productInput.publishAt > new Date()) {
+    updates.status = "DRAFT";
+    updates.publishedAt = undefined;
+  } else if (productInput.status === "ACTIVE") {
+    updates.publishedAt = new Date();
+    updates.publishAt = undefined;
+  } else if (productInput.status === "DRAFT") {
+    updates.publishedAt = undefined;
+    updates.publishAt = undefined;
+  } else if (productInput.status === "INACTIVE") {
+    updates.publishAt = undefined;
+  }
+
+  if (productInput.name && productInput.slug === undefined) {
+    updates.slug = normalizeSlug(productInput.name);
+  } else if (productInput.slug !== undefined) {
+    updates.slug = normalizeSlug(productInput.slug);
   }
 
   if (updates.slug === "") {
     throw ApiError.badRequest("A valid product slug is required.");
   }
 
-  if (input.sku !== undefined) {
-    updates.sku = normalizeSku(input.sku);
+  if (productInput.sku !== undefined) {
+    updates.sku = normalizeSku(productInput.sku);
   }
 
-  if (input.barcode !== undefined) {
-    updates.barcode = normalizeBarcode(input.barcode);
+  if (productInput.barcode !== undefined) {
+    updates.barcode = normalizeBarcode(productInput.barcode);
   }
 
-  if (input.tags !== undefined) {
-    updates.tags = [...new Set(input.tags.map((tag) => tag.trim()))];
+  if (productInput.tags !== undefined) {
+    updates.tags = [...new Set(productInput.tags.map((tag) => tag.trim()))];
   }
 
-  if (input.collectionIds !== undefined) {
-    updates.collectionIds = input.collectionIds;
+  if (productInput.collectionIds !== undefined) {
+    updates.collectionIds = productInput.collectionIds;
   }
 
   if (actorId && Types.ObjectId.isValid(actorId)) {
@@ -440,8 +671,8 @@ export async function updateProduct(
   const oldCollectionIds = (product.collectionIds ?? []).map(String);
 
   const newCollectionIds = (
-    input.collectionIds !== undefined
-      ? input.collectionIds
+    productInput.collectionIds !== undefined
+      ? productInput.collectionIds
       : (product.collectionIds ?? [])
   ).map(String);
 
@@ -461,6 +692,34 @@ export async function updateProduct(
 
   try {
     await session.withTransaction(async () => {
+      if (tagIds !== undefined) {
+        const uniqueTagIds = [...new Set(tagIds)];
+        const existingTagCount = await ProductTag.countDocuments({
+          _id: { $in: uniqueTagIds },
+        })
+          .session(session)
+          .exec();
+
+        if (existingTagCount !== uniqueTagIds.length) {
+          throw ApiError.badRequest("One or more product tags do not exist.");
+        }
+
+        await ProductTagAssignment.deleteMany(
+          { productId: product._id },
+          { session },
+        ).exec();
+
+        if (uniqueTagIds.length > 0) {
+          await ProductTagAssignment.insertMany(
+            uniqueTagIds.map((tagId) => ({
+              productId: product._id,
+              tagId: new Types.ObjectId(tagId),
+            })),
+            { session },
+          );
+        }
+      }
+
       Object.assign(product, updates);
       await product.save({ session });
 
@@ -513,6 +772,15 @@ export async function updateProductStatus(
   }
 
   product.status = status;
+  if (status === "ACTIVE") {
+    product.publishedAt = new Date();
+    product.publishAt = undefined;
+  } else if (status === "DRAFT") {
+    product.publishedAt = undefined;
+    product.publishAt = undefined;
+  } else {
+    product.publishAt = undefined;
+  }
 
   if (actorId && Types.ObjectId.isValid(actorId)) {
     product.updatedBy = new Types.ObjectId(actorId);

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import {
   AlertCircle,
   Boxes,
@@ -94,8 +93,9 @@ export default function AdminProductVariantsPage() {
   const [actionId, setActionId] = useState("");
 
   const [editorOpen, setEditorOpen] = useState(false);
-  const [editingVariant, setEditingVariant] =
-    useState<ProductVariant | null>(null);
+  const [editingVariant, setEditingVariant] = useState<ProductVariant | null>(
+    null,
+  );
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
 
@@ -104,15 +104,36 @@ export default function AdminProductVariantsPage() {
 
     try {
       const result = await productVariantsAdminApi.getVariableProducts();
+      const requestedProductId = new URLSearchParams(
+        window.location.search,
+      ).get("productId");
+      let products = result.items;
 
-      setProducts(result.items);
+      if (
+        requestedProductId &&
+        !products.some((product) => product._id === requestedProductId)
+      ) {
+        const requestedProduct =
+          await productVariantsAdminApi.getProduct(requestedProductId);
+        if (requestedProduct.type === "VARIABLE") {
+          products = [...products, requestedProduct];
+        }
+      }
+
+      setProducts(products);
 
       setProductId((current) => {
-        if (current && result.items.some((item) => item._id === current)) {
+        if (
+          requestedProductId &&
+          products.some((item) => item._id === requestedProductId)
+        ) {
+          return requestedProductId;
+        }
+        if (current && products.some((item) => item._id === current)) {
           return current;
         }
 
-        return result.items[0]?._id ?? "";
+        return products[0]?._id ?? "";
       });
     } catch (requestError) {
       setError(getErrorMessage(requestError));
@@ -122,7 +143,7 @@ export default function AdminProductVariantsPage() {
   }, []);
 
   useEffect(() => {
-    void loadProducts();
+    void Promise.resolve().then(loadProducts);
   }, [loadProducts]);
 
   const loadVariants = useCallback(async () => {
@@ -161,7 +182,7 @@ export default function AdminProductVariantsPage() {
   }, [productId, page, search, status]);
 
   useEffect(() => {
-    void loadVariants();
+    void Promise.resolve().then(loadVariants);
   }, [loadVariants, refreshKey]);
 
   const openCreate = () => {
@@ -217,11 +238,7 @@ export default function AdminProductVariantsPage() {
     try {
       options = JSON.parse(form.options);
 
-      if (
-        !options ||
-        Array.isArray(options) ||
-        typeof options !== "object"
-      ) {
+      if (!options || Array.isArray(options) || typeof options !== "object") {
         throw new Error("Options must be a JSON object.");
       }
 
@@ -230,11 +247,7 @@ export default function AdminProductVariantsPage() {
       }
 
       for (const [key, value] of Object.entries(options)) {
-        if (
-          !key.trim() ||
-          typeof value !== "string" ||
-          !value.trim()
-        ) {
+        if (!key.trim() || typeof value !== "string" || !value.trim()) {
           throw new Error("Every option must have a name and string value.");
         }
       }
@@ -275,8 +288,7 @@ export default function AdminProductVariantsPage() {
     if (
       numericValues.some(
         (value) =>
-          value !== undefined &&
-          (!Number.isFinite(value) || value < 0),
+          value !== undefined && (!Number.isFinite(value) || value < 0),
       )
     ) {
       window.alert("Numeric values must be valid non-negative numbers.");
@@ -369,9 +381,7 @@ export default function AdminProductVariantsPage() {
     }
   };
 
-  const selectedProduct = products.find(
-    (product) => product._id === productId,
-  );
+  const selectedProduct = products.find((product) => product._id === productId);
 
   const totalPages = Math.max(1, pagination.totalPages);
 
@@ -406,15 +416,17 @@ export default function AdminProductVariantsPage() {
               Refresh
             </button>
 
-            <button
-              type="button"
-              onClick={openCreate}
-              disabled={!productId || loadingProducts}
-              className="inline-flex h-11 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
-            >
-              <Plus className="h-4 w-4" />
-              Create variant
-            </button>
+            {productId && (
+              <button
+                type="button"
+                onClick={openCreate}
+                disabled={loadingProducts}
+                className="inline-flex h-11 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" />
+                Add Variant
+              </button>
+            )}
           </div>
         </header>
 
@@ -434,9 +446,7 @@ export default function AdminProductVariantsPage() {
                 className={inputClass}
               >
                 <option value="">
-                  {loadingProducts
-                    ? "Loading products..."
-                    : "Select a product"}
+                  {loadingProducts ? "Loading products..." : "Select a product"}
                 </option>
 
                 {products.map((product) => (
@@ -493,14 +503,10 @@ export default function AdminProductVariantsPage() {
               No VARIABLE products found
             </h2>
             <p className="mt-1 text-sm text-amber-800">
-              Create a product with type VARIABLE before adding variants.
+              Variants belong to a VARIABLE product. Create a product with type
+              VARIABLE in Catalog → Products, then select it here to add and
+              manage its variants.
             </p>
-            <Link
-              href="/admin/products"
-              className="mt-4 inline-flex rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
-            >
-              Go to Products
-            </Link>
           </section>
         )}
 
@@ -564,7 +570,7 @@ export default function AdminProductVariantsPage() {
                   <Boxes className="mx-auto h-10 w-10 text-slate-300" />
                   <h3 className="mt-3 font-semibold">No variants found</h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    Create a variant or change your search filters.
+                    Add a variant or change your search filters.
                   </p>
                   <button
                     type="button"
@@ -572,7 +578,7 @@ export default function AdminProductVariantsPage() {
                     className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
                   >
                     <Plus className="h-4 w-4" />
-                    Create variant
+                    Add Variant
                   </button>
                 </div>
               ) : (
@@ -633,7 +639,8 @@ export default function AdminProductVariantsPage() {
                             </p>
                             {variant.compareAtPrice !== undefined && (
                               <p className="text-xs text-slate-400">
-                                Compare: {variant.compareAtPrice.toLocaleString()}
+                                Compare:{" "}
+                                {variant.compareAtPrice.toLocaleString()}
                               </p>
                             )}
                           </td>
@@ -683,7 +690,9 @@ export default function AdminProductVariantsPage() {
                                 <button
                                   type="button"
                                   disabled={actionId === variant._id}
-                                  onClick={() => void deactivateVariant(variant)}
+                                  onClick={() =>
+                                    void deactivateVariant(variant)
+                                  }
                                   className="inline-flex items-center gap-1 font-medium text-red-600 hover:underline disabled:opacity-50"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
@@ -708,7 +717,9 @@ export default function AdminProductVariantsPage() {
                   <button
                     type="button"
                     disabled={page <= 1 || loading}
-                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    onClick={() =>
+                      setPage((current) => Math.max(1, current - 1))
+                    }
                     className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-sm disabled:opacity-40"
                   >
                     <ChevronLeft className="h-4 w-4" />
@@ -826,7 +837,8 @@ export default function AdminProductVariantsPage() {
                   className="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
                 <span className="mt-1 block text-xs font-normal text-slate-500">
-                  Example: {"{"}"Color": "Black", "Size": "Large"{"}"}. Maximum 20 options.
+                  Example: <code>{'{"Color": "Black", "Size": "Large"}'}</code>.
+                  Maximum 20 options.
                 </span>
               </label>
 

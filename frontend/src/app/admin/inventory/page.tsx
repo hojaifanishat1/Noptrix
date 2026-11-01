@@ -53,10 +53,33 @@ function getStatus(item: Inventory): InventoryStatus {
 
 function errorMessage(error: unknown): string {
   if (typeof error === "object" && error !== null && "response" in error) {
-    const response = (error as { response?: { data?: { message?: string } } })
-      .response;
+    const response = (
+      error as {
+        response?: {
+          data?: {
+            message?: string;
+            errors?: Array<{
+              field?: string;
+              message?: string;
+            }>;
+          };
+        };
+      }
+    ).response;
 
-    return response?.data?.message ?? "Something went wrong.";
+    const data = response?.data;
+
+    if (Array.isArray(data?.errors) && data.errors.length > 0) {
+      return data.errors
+        .map((issue) => {
+          const field = issue.field || "unknown";
+          const message = issue.message || "Invalid value";
+          return `${field}: ${message}`;
+        })
+        .join(" • ");
+    }
+
+    return data?.message ?? "Something went wrong.";
   }
 
   return error instanceof Error ? error.message : "Something went wrong.";
@@ -104,6 +127,7 @@ export default function AdminInventoryPage() {
     limit: 20,
     search: "",
     warehouseId: "",
+    productId: "",
     stockStatus: undefined,
     sortBy: "updatedAt",
     sortOrder: "desc",
@@ -167,6 +191,18 @@ export default function AdminInventoryPage() {
   useEffect(() => {
     void Promise.resolve().then(loadWarehouses);
   }, [loadWarehouses]);
+
+  useEffect(() => {
+    const productId = new URLSearchParams(window.location.search).get(
+      "productId",
+    );
+
+    if (productId) {
+      void Promise.resolve().then(() =>
+        setFilters((current) => ({ ...current, productId, page: 1 })),
+      );
+    }
+  }, []);
 
   useEffect(() => {
     void Promise.resolve().then(loadInventory);
@@ -379,6 +415,18 @@ export default function AdminInventoryPage() {
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+        {filters.productId && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:bg-blue-950/30 dark:text-blue-300">
+            <span>Showing inventory for product {filters.productId}</span>
+            <button
+              type="button"
+              onClick={() => updateFilter("productId", "")}
+              className="font-semibold underline"
+            >
+              Clear product filter
+            </button>
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div className="relative">
             <Search

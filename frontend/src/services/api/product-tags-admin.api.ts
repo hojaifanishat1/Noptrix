@@ -7,11 +7,20 @@ import type {
   ProductTagInput,
   ProductTagListResult,
   ProductTagProductListResult,
+  ProductTagProduct,
   ProductTagQuery,
   ProductTagUpdateInput,
 } from "@/features/product-tags/tag.types";
 
 export const productTagsAdminApi = {
+  async getProduct(productId: string): Promise<ProductTagProduct> {
+    const response = await apiClient.get<ApiResponse<ProductTagProduct>>(
+      `/products/${productId}`,
+    );
+
+    return response.data.data;
+  },
+
   async getAll(
     params: ProductTagQuery = {},
   ): Promise<ProductTagListResult> {

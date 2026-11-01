@@ -62,12 +62,12 @@ export const setLowStockThresholdController = asyncHandler(
 export const adjustInventoryController = asyncHandler(
   async (req: Request, res: Response) => {
     const inventoryId = String(req.params.id);
-    const current = await service.getInventory(inventoryId);
+    const current = await service.getInventoryReferences(inventoryId);
 
     await createStockMovement(
       {
-        productId: String(current.productId._id),
-        warehouseId: String(current.warehouseId._id),
+        productId: current.productId,
+        warehouseId: current.warehouseId,
         type: "ADJUSTMENT",
         quantity: req.body.quantityChange,
         reason: req.body.reason,

@@ -7,9 +7,18 @@ import type {
   VariantListParams,
   VariantListResult,
   ProductListResult,
+  VariableProduct,
 } from "@/features/product-variants/variant.types";
 
 export const productVariantsAdminApi = {
+  async getProduct(productId: string): Promise<VariableProduct> {
+    const response = await apiClient.get<ApiResponse<VariableProduct>>(
+      `/products/${productId}`,
+    );
+
+    return response.data.data;
+  },
+
   async getVariableProducts(): Promise<ProductListResult> {
     const response = await apiClient.get<ApiResponse<ProductListResult>>(
       "/products",

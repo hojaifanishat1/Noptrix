@@ -49,10 +49,17 @@ function getPagination(
 
 export const inventoryAdminApi = {
   async list(filters: InventoryFilters): Promise<InventoryListResult> {
+    const params = {
+      ...filters,
+      search: filters.search?.trim() || undefined,
+      warehouseId: filters.warehouseId || undefined,
+      productId: filters.productId || undefined,
+      stockStatus: filters.stockStatus || undefined,
+    };
     const response = await apiClient.get<ApiResponse<Inventory[] | {
       items: Inventory[];
       pagination?: PaginationMeta;
-    }>>("/inventory", { params: filters });
+    }>>("/inventory", { params });
 
     const payload = getPayload(response);
     const items = Array.isArray(payload) ? payload : payload?.items ?? [];

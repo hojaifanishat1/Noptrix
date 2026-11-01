@@ -135,13 +135,30 @@ export default function AdminProductTagsPage() {
 
     try {
       const result = await productTagsAdminApi.getProducts();
-      setProducts(result.items);
+      const requestedProductId = new URLSearchParams(
+        window.location.search,
+      ).get("productId");
+      let products = result.items;
+
+      if (
+        requestedProductId &&
+        !products.some((product) => product._id === requestedProductId)
+      ) {
+        const requestedProduct =
+          await productTagsAdminApi.getProduct(requestedProductId);
+        products = [...products, requestedProduct];
+      }
+
+      setProducts(products);
 
       setSelectedProductId((current) => {
-        if (current && result.items.some((item) => item._id === current)) {
+        if (requestedProductId && products.some((item) => item._id === requestedProductId)) {
+          return requestedProductId;
+        }
+        if (current && products.some((item) => item._id === current)) {
           return current;
         }
-        return result.items[0]?._id ?? "";
+        return products[0]?._id ?? "";
       });
     } catch (requestError) {
       setError(getErrorMessage(requestError));
@@ -172,15 +189,15 @@ export default function AdminProductTagsPage() {
   }, [selectedProductId]);
 
   useEffect(() => {
-    void loadTags();
+    void Promise.resolve().then(loadTags);
   }, [loadTags]);
 
   useEffect(() => {
-    void loadProducts();
+    void Promise.resolve().then(loadProducts);
   }, [loadProducts]);
 
   useEffect(() => {
-    void loadAssignments();
+    void Promise.resolve().then(loadAssignments);
   }, [loadAssignments]);
 
   const openCreate = () => {

@@ -18,6 +18,9 @@ export const PRODUCT_STATUSES = [
 
 export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
 
+export const PRODUCT_VISIBILITIES = ["VISIBLE", "HIDDEN"] as const;
+export type ProductVisibility = (typeof PRODUCT_VISIBILITIES)[number];
+
 export const INVENTORY_POLICIES = ["DENY", "CONTINUE"] as const;
 
 export type InventoryPolicy = (typeof INVENTORY_POLICIES)[number];
@@ -47,6 +50,8 @@ export interface ProductInput {
 
   type?: ProductType;
   status?: ProductStatus;
+  visibility?: ProductVisibility;
+  publishAt?: Date | null;
 
   sku?: string;
   barcode?: string;
@@ -60,13 +65,18 @@ export interface ProductInput {
   price: number;
   compareAtPrice?: number;
   costPrice?: number;
+  salePrice?: number | null;
+  saleStartsAt?: Date | null;
+  saleEndsAt?: Date | null;
 
   currency?: string;
+  tagIds?: string[];
 
   trackInventory?: boolean;
   stockQuantity?: number;
   lowStockThreshold?: number;
   inventoryPolicy?: InventoryPolicy;
+  inventoryWarehouseId?: string;
 
   requiresShipping?: boolean;
   shipping?: ProductShipping;

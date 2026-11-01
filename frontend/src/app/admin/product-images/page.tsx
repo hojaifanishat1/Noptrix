@@ -103,13 +103,30 @@ export default function AdminProductImagesPage() {
 
     try {
       const result = await productImagesAdminApi.getProducts();
-      setProducts(result.items);
+      const requestedProductId = new URLSearchParams(
+        window.location.search,
+      ).get("productId");
+      let products = result.items;
+
+      if (
+        requestedProductId &&
+        !products.some((product) => product._id === requestedProductId)
+      ) {
+        const requestedProduct =
+          await productImagesAdminApi.getProduct(requestedProductId);
+        products = [...products, requestedProduct];
+      }
+
+      setProducts(products);
 
       setProductId((current) => {
-        if (current && result.items.some((item) => item._id === current)) {
+        if (requestedProductId && products.some((item) => item._id === requestedProductId)) {
+          return requestedProductId;
+        }
+        if (current && products.some((item) => item._id === current)) {
           return current;
         }
-        return result.items[0]?._id ?? "";
+        return products[0]?._id ?? "";
       });
     } catch (requestError) {
       setError(getErrorMessage(requestError));
@@ -119,7 +136,7 @@ export default function AdminProductImagesPage() {
   }, []);
 
   useEffect(() => {
-    void loadProducts();
+    void Promise.resolve().then(loadProducts);
   }, [loadProducts]);
 
   const loadImages = useCallback(async () => {
@@ -155,7 +172,7 @@ export default function AdminProductImagesPage() {
   }, [productId, page]);
 
   useEffect(() => {
-    void loadImages();
+    void Promise.resolve().then(loadImages);
   }, [loadImages, refreshKey]);
 
   useEffect(() => {

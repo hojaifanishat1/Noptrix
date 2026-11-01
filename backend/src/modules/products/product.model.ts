@@ -11,11 +11,13 @@ import {
   INVENTORY_POLICIES,
   PRODUCT_STATUSES,
   PRODUCT_TYPES,
+  PRODUCT_VISIBILITIES,
   type InventoryPolicy,
   type ProductSEO,
   type ProductShipping,
   type ProductStatus,
   type ProductType,
+  type ProductVisibility,
 } from "./product.types";
 
 export interface Product {
@@ -27,6 +29,9 @@ export interface Product {
 
   type: ProductType;
   status: ProductStatus;
+  visibility: ProductVisibility;
+  publishAt?: Date;
+  publishedAt?: Date;
 
   sku?: string;
   barcode?: string;
@@ -40,6 +45,9 @@ export interface Product {
   price: number;
   compareAtPrice?: number;
   costPrice?: number;
+  salePrice?: number;
+  saleStartsAt?: Date;
+  saleEndsAt?: Date;
   currency: string;
 
   trackInventory: boolean;
@@ -143,6 +151,23 @@ const productSchema = new Schema<Product>(
       required: true,
     },
 
+    visibility: {
+      type: String,
+      enum: PRODUCT_VISIBILITIES,
+      default: "VISIBLE",
+      required: true,
+      index: true,
+    },
+
+    publishAt: {
+      type: Date,
+      index: true,
+    },
+
+    publishedAt: {
+      type: Date,
+    },
+
     sku: {
       type: String,
       trim: true,
@@ -197,6 +222,19 @@ const productSchema = new Schema<Product>(
     compareAtPrice: {
       type: Number,
       min: 0,
+    },
+
+    salePrice: {
+      type: Number,
+      min: 0,
+    },
+
+    saleStartsAt: {
+      type: Date,
+    },
+
+    saleEndsAt: {
+      type: Date,
     },
 
     costPrice: {
@@ -338,6 +376,8 @@ productSchema.index({
   featured: 1,
   sortOrder: 1,
 });
+
+productSchema.index({ status: 1, publishAt: 1 });
 
 productSchema.index({
   name: "text",
