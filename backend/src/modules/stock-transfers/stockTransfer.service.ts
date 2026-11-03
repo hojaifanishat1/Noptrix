@@ -2,7 +2,11 @@ import mongoose, { Types } from "mongoose";
 
 import { ApiError } from "../../utils/ApiError";
 import { InventoryModel } from "../inventory/inventory.model";
-import { assertStockReferences } from "../inventory/inventory.service";
+import {
+  assertStockReferences,
+  getDefaultLowStockThreshold,
+  syncInventoryStockQuantity,
+} from "../inventory/inventory.service";
 import { WarehouseModel } from "../warehouses/warehouse.model";
 import { StockMovementModel } from "../stock-movements/stockMovement.model";
 import { StockTransferModel } from "./stockTransfer.model";
@@ -68,6 +72,7 @@ function addAudit(
 
 function validateCreateInput(input: CreateStockTransferInput): void {
   assertObjectId(input.productId, "productId");
+  if (input.variantId) assertObjectId(input.variantId, "variantId");
   assertObjectId(input.sourceWarehouseId, "sourceWarehouseId");
   assertObjectId(input.destinationWarehouseId, "destinationWarehouseId");
 
@@ -146,6 +151,7 @@ async function assertWarehouseActive(
 
 async function updateInventory(
   productId: Types.ObjectId,
+  variantId: Types.ObjectId | undefined,
   warehouseId: Types.ObjectId,
   quantityDelta: number,
   adminId: Types.ObjectId,
@@ -154,6 +160,7 @@ async function updateInventory(
 ): Promise<{ before: number; after: number }> {
   let inventory = await InventoryModel.findOne({
     productId,
+    ...(variantId ? { variantId } : { variantId: { $exists: false } }),
     warehouseId,
   })
     .session(session)
@@ -164,14 +171,19 @@ async function updateInventory(
       throw ApiError.conflict("Insufficient stock in source warehouse.");
     }
 
+    const lowStockThreshold = await getDefaultLowStockThreshold(
+      variantId,
+      session,
+    );
     const [created] = await InventoryModel.create(
       [
         {
           productId,
+          ...(variantId ? { variantId } : {}),
           warehouseId,
           quantity: 0,
           reservedQuantity: 0,
-          lowStockThreshold: 5,
+          lowStockThreshold,
         },
       ],
       { session },
@@ -228,6 +240,7 @@ async function updateInventory(
 
 async function createMovementRecord(args: {
   productId: Types.ObjectId;
+  variantId?: Types.ObjectId;
   sourceWarehouseId: Types.ObjectId;
   destinationWarehouseId: Types.ObjectId;
   quantity: number;
@@ -245,6 +258,7 @@ async function createMovementRecord(args: {
     [
       {
         productId: args.productId,
+        ...(args.variantId ? { variantId: args.variantId } : {}),
         warehouseId: args.sourceWarehouseId,
         destinationWarehouseId: args.destinationWarehouseId,
         type: "TRANSFER",
@@ -278,6 +292,9 @@ export async function createStockTransfer(
 
   const actorId = assertAdminId(adminId);
   const productId = new Types.ObjectId(input.productId);
+  const variantId = input.variantId
+    ? new Types.ObjectId(input.variantId)
+    : undefined;
   const sourceWarehouseId = new Types.ObjectId(input.sourceWarehouseId);
   const destinationWarehouseId = new Types.ObjectId(
     input.destinationWarehouseId,
@@ -299,14 +316,25 @@ export async function createStockTransfer(
     let createdId: Types.ObjectId | undefined;
 
     await session.withTransaction(async () => {
-      await assertStockReferences(productId, sourceWarehouseId, session);
-      await assertStockReferences(productId, destinationWarehouseId, session);
+      await assertStockReferences(
+        productId,
+        sourceWarehouseId,
+        session,
+        variantId,
+      );
+      await assertStockReferences(
+        productId,
+        destinationWarehouseId,
+        session,
+        variantId,
+      );
 
       const [transfer] = await StockTransferModel.create(
         [
           {
             transferNumber: createTransferNumber(),
             productId,
+            ...(variantId ? { variantId } : {}),
             sourceWarehouseId,
             destinationWarehouseId,
             quantity: input.quantity,
@@ -401,6 +429,7 @@ export async function listStockTransfers(filters: StockTransferFilters) {
   const [items, total] = await Promise.all([
     StockTransferModel.find(query)
       .populate("productId")
+      .populate("variantId")
       .populate("sourceWarehouseId")
       .populate("destinationWarehouseId")
       .populate("createdBy", "name email")
@@ -434,6 +463,7 @@ export async function getStockTransfer(id: string) {
 
   const transfer = await StockTransferModel.findById(id)
     .populate("productId")
+    .populate("variantId")
     .populate("sourceWarehouseId")
     .populate("destinationWarehouseId")
     .populate("createdBy", "name email")
@@ -506,6 +536,7 @@ async function updateTransferStatus(
 
         const source = await updateInventory(
           transfer.productId,
+          transfer.variantId,
           transfer.sourceWarehouseId,
           -transfer.quantity,
           actorId,
@@ -520,6 +551,7 @@ async function updateTransferStatus(
 
         await createMovementRecord({
           productId: transfer.productId,
+          ...(transfer.variantId ? { variantId: transfer.variantId } : {}),
           sourceWarehouseId: transfer.sourceWarehouseId,
           destinationWarehouseId: transfer.destinationWarehouseId,
           quantity: transfer.quantity,
@@ -542,6 +574,7 @@ async function updateTransferStatus(
 
         const destination = await updateInventory(
           transfer.productId,
+          transfer.variantId,
           transfer.destinationWarehouseId,
           transfer.quantity,
           actorId,
@@ -556,6 +589,7 @@ async function updateTransferStatus(
 
         await createMovementRecord({
           productId: transfer.productId,
+          ...(transfer.variantId ? { variantId: transfer.variantId } : {}),
           sourceWarehouseId: transfer.sourceWarehouseId,
           destinationWarehouseId: transfer.destinationWarehouseId,
           quantity: transfer.quantity,
@@ -582,6 +616,14 @@ async function updateTransferStatus(
         transfer.cancellationReason = note?.trim() || "Transfer cancelled.";
 
         addAudit(transfer, "CANCELLED", actorId, note);
+      }
+
+      if (action === "DISPATCH" || action === "RECEIVE") {
+        await syncInventoryStockQuantity(
+          transfer.productId,
+          transfer.variantId,
+          session,
+        );
       }
 
       await transfer.save({ session });

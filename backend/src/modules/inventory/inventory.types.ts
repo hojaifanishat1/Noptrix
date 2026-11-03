@@ -4,6 +4,7 @@ export type InventoryStatus = "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK";
 
 export interface Inventory {
   productId: Types.ObjectId;
+  variantId?: Types.ObjectId;
   warehouseId: Types.ObjectId;
   quantity: number;
   reservedQuantity: number;
@@ -18,6 +19,7 @@ export interface InventoryListFilters {
   search?: string;
   warehouseId?: string;
   productId?: string;
+  variantId?: string;
   stockStatus?: InventoryStatus;
   sortBy: "quantity" | "createdAt" | "updatedAt";
   sortOrder: "asc" | "desc";
@@ -32,6 +34,7 @@ export interface InventoryAdjustmentInput {
 export interface InventoryListItem {
   _id: string;
   productId: Types.ObjectId;
+  variantId?: Types.ObjectId;
   warehouseId: Types.ObjectId;
   quantity: number;
   reservedQuantity: number;

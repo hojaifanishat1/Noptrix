@@ -20,6 +20,10 @@ export const listInventoryController = asyncHandler(
         typeof req.query.productId === "string"
           ? req.query.productId
           : undefined,
+      variantId:
+        typeof req.query.variantId === "string"
+          ? req.query.variantId
+          : undefined,
       stockStatus:
         req.query.stockStatus === "IN_STOCK" ||
         req.query.stockStatus === "LOW_STOCK" ||
@@ -48,6 +52,17 @@ export const getInventoryController = asyncHandler(
   },
 );
 
+export const getProductStockCapacityController = asyncHandler(
+  async (req: Request, res: Response) => {
+    const capacity = await service.getProductStockCapacity(
+      String(req.params.productId),
+    );
+    res
+      .status(200)
+      .json(ApiResponse.ok(capacity, "Product stock capacity retrieved."));
+  },
+);
+
 export const setLowStockThresholdController = asyncHandler(
   async (req: Request, res: Response) => {
     const item = await service.setLowStockThreshold(
@@ -67,6 +82,7 @@ export const adjustInventoryController = asyncHandler(
     await createStockMovement(
       {
         productId: current.productId,
+        ...(current.variantId ? { variantId: current.variantId } : {}),
         warehouseId: current.warehouseId,
         type: "ADJUSTMENT",
         quantity: req.body.quantityChange,

@@ -11,11 +11,18 @@ import {
   RefreshCw,
   Search,
   Trash2,
+  Warehouse,
   X,
 } from "lucide-react";
 
+import { inventoryAdminApi } from "@/services/api/inventory-admin.api";
 import { productVariantsAdminApi } from "@/services/api/product-variants-admin.api";
 
+import type {
+  Inventory,
+  ProductStockCapacity,
+  WarehouseOption,
+} from "@/features/inventory/inventory.types";
 import type {
   ProductVariant,
   VariantInput,
@@ -64,7 +71,6 @@ const emptyForm = {
   compareAtPrice: "",
   costPrice: "",
   trackInventory: true,
-  stockQuantity: "0",
   lowStockThreshold: "5",
   status: "ACTIVE" as VariantStatus,
   sortOrder: "0",
@@ -98,6 +104,17 @@ export default function AdminProductVariantsPage() {
   );
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [stockEditorVariant, setStockEditorVariant] =
+    useState<ProductVariant | null>(null);
+  const [stockWarehouses, setStockWarehouses] = useState<WarehouseOption[]>([]);
+  const [stockInventory, setStockInventory] = useState<Inventory[]>([]);
+  const [stockCapacity, setStockCapacity] =
+    useState<ProductStockCapacity | null>(null);
+  const [stockWarehouseId, setStockWarehouseId] = useState("");
+  const [stockTargetQuantity, setStockTargetQuantity] = useState("");
+  const [stockLoading, setStockLoading] = useState(false);
+  const [stockSaving, setStockSaving] = useState(false);
+  const [stockError, setStockError] = useState("");
 
   const loadProducts = useCallback(async () => {
     setLoadingProducts(true);
@@ -211,7 +228,6 @@ export default function AdminProductVariantsPage() {
         compareAtPrice: fullVariant.compareAtPrice?.toString() ?? "",
         costPrice: fullVariant.costPrice?.toString() ?? "",
         trackInventory: fullVariant.trackInventory,
-        stockQuantity: String(fullVariant.stockQuantity ?? 0),
         lowStockThreshold: String(fullVariant.lowStockThreshold ?? 5),
         status: fullVariant.status,
         sortOrder: String(fullVariant.sortOrder ?? 0),
@@ -272,7 +288,6 @@ export default function AdminProductVariantsPage() {
       ? Number(form.costPrice)
       : undefined;
 
-    const stockQuantity = Number(form.stockQuantity);
     const lowStockThreshold = Number(form.lowStockThreshold);
     const sortOrder = Number(form.sortOrder);
 
@@ -280,7 +295,6 @@ export default function AdminProductVariantsPage() {
       price,
       compareAtPrice,
       costPrice,
-      stockQuantity,
       lowStockThreshold,
       sortOrder,
     ];
@@ -295,14 +309,8 @@ export default function AdminProductVariantsPage() {
       return;
     }
 
-    if (
-      !Number.isInteger(stockQuantity) ||
-      !Number.isInteger(lowStockThreshold) ||
-      !Number.isInteger(sortOrder)
-    ) {
-      window.alert(
-        "Stock quantity, low stock threshold and sort order must be integers.",
-      );
+    if (!Number.isInteger(lowStockThreshold) || !Number.isInteger(sortOrder)) {
+      window.alert("Low stock threshold and sort order must be integers.");
       return;
     }
 
@@ -319,7 +327,6 @@ export default function AdminProductVariantsPage() {
       title: form.title.trim(),
       options,
       trackInventory: form.trackInventory,
-      stockQuantity,
       lowStockThreshold,
       status: form.status,
       sortOrder,
@@ -381,7 +388,157 @@ export default function AdminProductVariantsPage() {
     }
   };
 
+  const openStockEditor = async (variant: ProductVariant) => {
+    setStockEditorVariant(variant);
+    setStockLoading(true);
+    setStockError("");
+    setStockWarehouses([]);
+    setStockInventory([]);
+    setStockCapacity(null);
+    setStockWarehouseId("");
+    setStockTargetQuantity("");
+
+    try {
+      const [warehouses, inventory, capacity] = await Promise.all([
+        inventoryAdminApi.warehouses(),
+        inventoryAdminApi.list({
+          page: 1,
+          limit: 100,
+          variantId: variant._id,
+          sortBy: "updatedAt",
+          sortOrder: "desc",
+        }),
+        inventoryAdminApi.getProductStockCapacity(productId),
+      ]);
+
+      setStockWarehouses(warehouses);
+      setStockInventory(inventory.items);
+      setStockCapacity(capacity);
+
+      const firstAvailableInventory = inventory.items.find((item) => {
+        const warehouseId =
+          typeof item.warehouseId === "string"
+            ? item.warehouseId
+            : item.warehouseId._id;
+        return warehouses.some((warehouse) => warehouse._id === warehouseId);
+      });
+      const initialWarehouseId = firstAvailableInventory
+        ? typeof firstAvailableInventory.warehouseId === "string"
+          ? firstAvailableInventory.warehouseId
+          : firstAvailableInventory.warehouseId._id
+        : (warehouses.find((warehouse) => warehouse.isDefault)?._id ??
+          warehouses[0]?._id ??
+          "");
+      setStockWarehouseId(initialWarehouseId);
+
+      const initialInventory = inventory.items.find(
+        (item) =>
+          (typeof item.warehouseId === "string"
+            ? item.warehouseId
+            : item.warehouseId._id) === initialWarehouseId,
+      );
+      setStockTargetQuantity(String(initialInventory?.quantity ?? 0));
+    } catch (requestError) {
+      setStockError(getErrorMessage(requestError));
+    } finally {
+      setStockLoading(false);
+    }
+  };
+
+  const changeStockWarehouse = (warehouseId: string) => {
+    setStockWarehouseId(warehouseId);
+    const inventory = stockInventory.find(
+      (item) =>
+        (typeof item.warehouseId === "string"
+          ? item.warehouseId
+          : item.warehouseId._id) === warehouseId,
+    );
+    setStockTargetQuantity(String(inventory?.quantity ?? 0));
+  };
+
+  const saveVariantStock = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!stockEditorVariant || !stockWarehouseId) {
+      setStockError("Select an active warehouse.");
+      return;
+    }
+
+    if (!stockTargetQuantity.trim()) {
+      setStockError("Enter the counted stock quantity.");
+      return;
+    }
+
+    const targetQuantity = Number(stockTargetQuantity);
+    if (!Number.isSafeInteger(targetQuantity) || targetQuantity < 0) {
+      setStockError("Stock quantity must be a non-negative whole number.");
+      return;
+    }
+
+    const inventory = stockInventory.find(
+      (item) =>
+        (typeof item.warehouseId === "string"
+          ? item.warehouseId
+          : item.warehouseId._id) === stockWarehouseId,
+    );
+    if (!inventory) {
+      setStockError(
+        "No received inventory exists for this variant in the selected warehouse. Receive or transfer stock there first.",
+      );
+      return;
+    }
+
+    const currentQuantity = inventory?.quantity ?? 0;
+    const reservedQuantity = inventory?.reservedQuantity ?? 0;
+    const maxWarehouseQuantity =
+      currentQuantity + (stockCapacity?.availableToAllocate ?? 0);
+
+    if (targetQuantity < reservedQuantity) {
+      setStockError(
+        `Stock cannot be lower than the ${reservedQuantity} reserved units.`,
+      );
+      return;
+    }
+
+    if (targetQuantity > maxWarehouseQuantity) {
+      setStockError(
+        `All variant stock cannot exceed the product's received stock limit. Maximum for this warehouse: ${maxWarehouseQuantity}.`,
+      );
+      return;
+    }
+
+    const quantityChange = targetQuantity - currentQuantity;
+    if (quantityChange === 0) {
+      setStockEditorVariant(null);
+      return;
+    }
+
+    setStockSaving(true);
+    setStockError("");
+
+    try {
+      await inventoryAdminApi.adjust(inventory._id, {
+        quantityChange,
+        reason: "Variant stock count adjustment",
+        reference: "Product variants page",
+      });
+
+      setStockEditorVariant(null);
+      await loadVariants();
+    } catch (requestError) {
+      setStockError(getErrorMessage(requestError));
+    } finally {
+      setStockSaving(false);
+    }
+  };
+
   const selectedProduct = products.find((product) => product._id === productId);
+  const selectedStockInventory = stockInventory.find(
+    (item) =>
+      (typeof item.warehouseId === "string"
+        ? item.warehouseId
+        : item.warehouseId._id) === stockWarehouseId,
+  );
 
   const totalPages = Math.max(1, pagination.totalPages);
 
@@ -398,7 +555,8 @@ export default function AdminProductVariantsPage() {
                 Product Variants
               </h1>
               <p className="mt-1 text-sm text-slate-500">
-                Manage product options, SKU, pricing and inventory.
+                Manage product options, pricing and warehouse-level variant
+                stock.
               </p>
             </div>
           </div>
@@ -649,11 +807,23 @@ export default function AdminProductVariantsPage() {
                             {variant.trackInventory ? (
                               <>
                                 <p className="font-semibold">
-                                  {variant.stockQuantity} units
+                                  {variant.stockQuantity} units total
                                 </p>
                                 <p className="text-xs text-slate-500">
                                   Low stock: {variant.lowStockThreshold}
                                 </p>
+                                <button
+                                  type="button"
+                                  disabled={
+                                    variant.status !== "ACTIVE" ||
+                                    actionId === variant._id
+                                  }
+                                  onClick={() => void openStockEditor(variant)}
+                                  className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:underline disabled:opacity-50"
+                                >
+                                  <Warehouse className="h-3.5 w-3.5" />
+                                  Update stock
+                                </button>
                               </>
                             ) : (
                               <span className="text-slate-500">
@@ -910,24 +1080,17 @@ export default function AdminProductVariantsPage() {
                 </label>
 
                 {form.trackInventory && (
-                  <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                    <label className="text-sm font-medium text-slate-700">
-                      Stock quantity
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={form.stockQuantity}
-                        onChange={(event) =>
-                          setForm({
-                            ...form,
-                            stockQuantity: event.target.value,
-                          })
-                        }
-                        className={inputClass}
-                      />
-                    </label>
-
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div className="text-sm text-slate-600 sm:col-span-2">
+                      Variant stock is managed by warehouse in the{" "}
+                      <a
+                        className="font-semibold text-blue-600 underline"
+                        href="/admin/inventory"
+                      >
+                        Inventory page
+                      </a>
+                      .
+                    </div>
                     <label className="text-sm font-medium text-slate-700">
                       Low stock threshold
                       <input
@@ -996,6 +1159,142 @@ export default function AdminProductVariantsPage() {
                     : editingVariant
                       ? "Save changes"
                       : "Create variant"}
+                </button>
+              </footer>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {stockEditorVariant && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 p-4 sm:items-center">
+          <section className="my-4 w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+            <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div>
+                <h2 className="text-lg font-bold">Update variant stock</h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  {selectedProduct?.name} — {stockEditorVariant.title}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStockEditorVariant(null)}
+                disabled={stockSaving}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-50"
+                aria-label="Close stock editor"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </header>
+
+            <form onSubmit={saveVariantStock} className="space-y-4 p-5">
+              {stockError && (
+                <p
+                  role="alert"
+                  className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+                >
+                  {stockError}
+                </p>
+              )}
+
+              {stockLoading ? (
+                <p className="text-sm text-slate-500">
+                  Loading warehouse stock...
+                </p>
+              ) : (
+                <>
+                  <label className="block text-sm font-medium text-slate-700">
+                    Warehouse
+                    <select
+                      required
+                      value={stockWarehouseId}
+                      onChange={(event) =>
+                        changeStockWarehouse(event.target.value)
+                      }
+                      className={inputClass}
+                    >
+                      <option value="">Select a warehouse</option>
+                      {stockWarehouses.map((warehouse) => (
+                        <option key={warehouse._id} value={warehouse._id}>
+                          {warehouse.name} ({warehouse.code})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {stockWarehouses.length === 0 && (
+                    <p className="text-sm text-amber-700">
+                      No active warehouse is available for stock tracking.
+                    </p>
+                  )}
+
+                  <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+                    Current stock: {selectedStockInventory?.quantity ?? 0}
+                    {" · "}Reserved:{" "}
+                    {selectedStockInventory?.reservedQuantity ?? 0}
+                    {" · "}Available:{" "}
+                    {selectedStockInventory
+                      ? selectedStockInventory.quantity -
+                        selectedStockInventory.reservedQuantity
+                      : 0}
+                  </div>
+
+                  <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-800">
+                    Product received stock:{" "}
+                    {stockCapacity?.totalStockLimit ?? "—"}
+                    {" · "}Allocated to variants:{" "}
+                    {stockCapacity?.allocatedQuantity ?? "—"}
+                    {" · "}Available to allocate:{" "}
+                    {stockCapacity?.availableToAllocate ?? "—"}
+                  </div>
+
+                  <label className="block text-sm font-medium text-slate-700">
+                    Counted stock in this warehouse
+                    <input
+                      required
+                      type="number"
+                      min={selectedStockInventory?.reservedQuantity ?? 0}
+                      max={
+                        (selectedStockInventory?.quantity ?? 0) +
+                        (stockCapacity?.availableToAllocate ?? 0)
+                      }
+                      step="1"
+                      value={stockTargetQuantity}
+                      onChange={(event) =>
+                        setStockTargetQuantity(event.target.value)
+                      }
+                      className={inputClass}
+                    />
+                  </label>
+
+                  <p className="text-xs text-slate-500">
+                    All variant quantities together cannot exceed the
+                    product&apos;s net received quantity. Reserved units cannot
+                    be reduced.
+                  </p>
+                </>
+              )}
+
+              <footer className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setStockEditorVariant(null)}
+                  disabled={stockSaving}
+                  className="h-11 rounded-lg border border-slate-200 px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    stockLoading ||
+                    stockSaving ||
+                    !stockWarehouseId ||
+                    stockWarehouses.length === 0
+                  }
+                  className="h-11 rounded-lg bg-slate-900 px-5 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+                >
+                  {stockSaving ? "Saving..." : "Save stock"}
                 </button>
               </footer>
             </form>

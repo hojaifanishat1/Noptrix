@@ -90,6 +90,7 @@ export async function listLowStock(filters: LowStockQuery) {
       .skip(skip)
       .limit(filters.limit)
       .populate("productId")
+      .populate("variantId")
       .populate("warehouseId")
       .lean()
       .exec(),

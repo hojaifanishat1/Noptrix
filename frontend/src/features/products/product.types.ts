@@ -1,10 +1,6 @@
 export type ProductType = "SIMPLE" | "VARIABLE" | "DIGITAL" | "SERVICE";
 
-export type ProductStatus =
-  | "DRAFT"
-  | "ACTIVE"
-  | "INACTIVE"
-  | "ARCHIVED";
+export type ProductStatus = "DRAFT" | "ACTIVE" | "INACTIVE" | "ARCHIVED";
 
 export type ProductVisibility = "VISIBLE" | "HIDDEN";
 
@@ -112,7 +108,9 @@ export interface ProductInput {
   sortOrder?: number;
 }
 
-export type ProductUpdateInput = Partial<ProductInput>;
+export type ProductUpdateInput = Partial<
+  Omit<ProductInput, "stockQuantity" | "inventoryWarehouseId">
+>;
 
 export interface ProductFilters {
   page?: number;

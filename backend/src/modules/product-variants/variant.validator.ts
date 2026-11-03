@@ -25,7 +25,6 @@ const variantBodyBaseSchema = z
     compareAtPrice: z.number().finite().min(0).optional(),
     costPrice: z.number().finite().min(0).optional(),
     trackInventory: z.boolean().optional(),
-    stockQuantity: z.number().int().min(0).optional(),
     lowStockThreshold: z.number().int().min(0).optional(),
     status: z.enum(VARIANT_STATUSES).optional(),
     sortOrder: z.number().int().optional(),

@@ -11,6 +11,7 @@ const positiveQuantity = z
 export const createStockTransferSchema = z
   .object({
     productId: objectId,
+    variantId: objectId.optional(),
 
     sourceWarehouseId: objectId,
 

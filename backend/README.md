@@ -46,6 +46,37 @@ npm run build
 npm audit
 ```
 
-`docker-compose.yml` provisions Redis for local development only. Its published
-port is bound to loopback; production deployments should use a protected,
-private Redis endpoint.
+`docker-compose.yml` provisions MongoDB and Redis for local development only.
+Their published ports are bound to loopback; production deployments should use
+protected, private services.
+
+Running `npm run dev` creates the local Redis data volume if needed, then starts
+Redis and waits for its health check before launching the backend. Redis uses a
+persistent Docker volume and restarts automatically after Docker restarts. If
+Docker is unavailable or Redis does not become healthy, the predev command
+reports the error before the backend starts.
+
+### Inventory and procurement workflow
+
+Inventory availability is calculated as on-hand quantity minus reserved
+quantity. Creating an order reserves stock across active warehouses (default
+warehouse first); fulfillment deducts the reservation and records an outbound
+stock movement, while an approved cancellation releases the reservation.
+Receiving a purchase adds only the quantities physically received. From Low
+Stock, use **Create purchase** to prepare a draft for the affected product and
+warehouse, then choose a supplier and review the suggested restock quantity
+before submitting it.
+
+### Local MongoDB for transaction-backed workflows
+
+Inventory changes, purchases, transfers, cart updates and checkout use MongoDB
+transactions. Start the local single-node replica set from this directory:
+
+```sh
+docker compose up -d mongodb
+```
+
+Set `MONGODB_URI` in your local environment to
+`mongodb://127.0.0.1:27017/noptrix?replicaSet=rs0`. A standalone MongoDB server
+cannot run these workflows; the backend now reports a configuration error at
+startup if the connected server does not support transactions.

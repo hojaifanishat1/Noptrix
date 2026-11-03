@@ -234,7 +234,7 @@ export async function createVariant(
       options,
       optionsKey: createOptionsKey(options),
       trackInventory: input.trackInventory ?? true,
-      stockQuantity: input.stockQuantity ?? 0,
+      stockQuantity: 0,
       lowStockThreshold: input.lowStockThreshold ?? 5,
       status: input.status ?? "ACTIVE",
       sortOrder: input.sortOrder ?? 0,

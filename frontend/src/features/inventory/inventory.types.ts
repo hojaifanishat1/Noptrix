@@ -1,9 +1,6 @@
 import type { PaginationMeta } from "@/types/api";
 
-export type InventoryStatus =
-  | "IN_STOCK"
-  | "LOW_STOCK"
-  | "OUT_OF_STOCK";
+export type InventoryStatus = "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK";
 
 export interface InventoryReference {
   _id: string;
@@ -11,12 +8,14 @@ export interface InventoryReference {
   sku?: string;
   code?: string;
   imageUrl?: string;
+  title?: string;
 }
 
 export interface Inventory {
   _id: string;
   id?: string;
   productId: string | InventoryReference;
+  variantId?: string | InventoryReference;
   warehouseId: string | InventoryReference;
   quantity: number;
   reservedQuantity: number;
@@ -42,6 +41,7 @@ export interface InventoryFilters {
   search?: string;
   warehouseId?: string;
   productId?: string;
+  variantId?: string;
   stockStatus?: InventoryStatus;
   sortBy: "quantity" | "createdAt" | "updatedAt";
   sortOrder: "asc" | "desc";
@@ -50,6 +50,12 @@ export interface InventoryFilters {
 export interface InventoryListResult {
   items: Inventory[];
   pagination: PaginationMeta;
+}
+
+export interface ProductStockCapacity {
+  totalStockLimit: number;
+  allocatedQuantity: number;
+  availableToAllocate: number;
 }
 
 export interface InventoryAdjustmentInput {

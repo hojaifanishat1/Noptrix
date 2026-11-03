@@ -10,7 +10,6 @@ import {
   Search,
   RefreshCw,
   Pencil,
-  Trash2,
   X,
   Save,
   Package,
@@ -19,7 +18,6 @@ import {
   ChevronRight,
   Loader2,
   Archive,
-  Filter,
   ChevronDown,
 } from "lucide-react";
 
@@ -100,7 +98,6 @@ type VariantDraft = {
   compareAtPrice: string;
   costPrice: string;
   trackInventory: boolean;
-  stockQuantity: string;
   lowStockThreshold: string;
 };
 
@@ -387,6 +384,17 @@ function getAttributeInitialValue(attribute: Attribute): unknown {
   }
 }
 
+function isSelectedVariantAttribute(
+  form: FormState,
+  attribute: Attribute,
+  selectedVariantAttributeIds: string[],
+): boolean {
+  return (
+    form.type === "VARIABLE" &&
+    selectedVariantAttributeIds.includes(attribute._id)
+  );
+}
+
 function getVariantCombinations(
   selections: Array<{ name: string; values: string[] }>,
 ): Array<Record<string, string>> {
@@ -458,6 +466,31 @@ export default function AdminProductsPage() {
   const [pendingPublishStatus, setPendingPublishStatus] =
     useState<ProductStatus | null>(null);
 
+  const loadActiveAttributes = useCallback(async () => {
+    const firstPage = await attributesAdminApi.getAll({
+      page: 1,
+      limit: 100,
+      status: "ACTIVE",
+    });
+    const activeAttributes = [...firstPage.items];
+
+    for (
+      let pageNumber = 2;
+      pageNumber <= firstPage.pagination.totalPages;
+      pageNumber += 1
+    ) {
+      const pageResult = await attributesAdminApi.getAll({
+        page: pageNumber,
+        limit: 100,
+        status: "ACTIVE",
+      });
+      activeAttributes.push(...pageResult.items);
+    }
+
+    setAttributes(activeAttributes);
+    return activeAttributes;
+  }, []);
+
   const loadProducts = useCallback(async () => {
     setLoading(true);
 
@@ -504,7 +537,7 @@ export default function AdminProductsPage() {
       productsAdminApi.getBrands(),
       productsAdminApi.getCollections(),
       productTagsAdminApi.getAll({ page: 1, limit: 100 }),
-      attributesAdminApi.getAll({ page: 1, limit: 100, status: "ACTIVE" }),
+      loadActiveAttributes(),
     ]);
     const optionNames = [
       "categories",
@@ -529,11 +562,8 @@ export default function AdminProductsPage() {
     if (results[4].status === "fulfilled") {
       setManagedTags(results[4].value.items);
     }
-    if (results[5].status === "fulfilled") {
-      setAttributes([...results[5].value.items]);
-    }
     setRelatedOptionsError(failures.join(" • "));
-  }, []);
+  }, [loadActiveAttributes]);
 
   const loadWarehouses = useCallback(async () => {
     setWarehousesLoading(true);
@@ -588,29 +618,68 @@ export default function AdminProductsPage() {
     () =>
       attributes.filter(
         (attribute) =>
-          attribute.isVariant &&
+          form.type === "VARIABLE" &&
+          variantAttributeIds.includes(attribute._id) &&
           (attribute.type === "SELECT" || attribute.type === "MULTI_SELECT") &&
           attribute.options.length > 0,
       ),
-    [attributes],
+    [attributes, form.type, variantAttributeIds],
   );
 
   function updateForm<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((previous) => ({ ...previous, [key]: value }));
   }
 
+  function changeProductType(type: ProductType) {
+    if (type === form.type) return;
+
+    if (type === "VARIABLE") {
+      const variantAttributesToMove = attributes.filter(
+        (attribute) =>
+          (attribute.type === "SELECT" || attribute.type === "MULTI_SELECT") &&
+          Object.prototype.hasOwnProperty.call(form.attributes, attribute.slug),
+      );
+      const nextAttributes = { ...form.attributes };
+
+      for (const attribute of variantAttributesToMove) {
+        delete nextAttributes[attribute.slug];
+      }
+
+      setVariantAttributeIds((current) => [
+        ...new Set([
+          ...current,
+          ...variantAttributesToMove.map((attribute) => attribute._id),
+        ]),
+      ]);
+      setForm((current) => ({ ...current, type, attributes: nextAttributes }));
+    } else {
+      const nextAttributes = { ...form.attributes };
+
+      for (const attributeId of variantAttributeIds) {
+        const attribute = attributes.find((item) => item._id === attributeId);
+        if (attribute) {
+          nextAttributes[attribute.slug] ??=
+            getAttributeInitialValue(attribute);
+        }
+      }
+
+      setVariantAttributeIds([]);
+      setVariantSelections({});
+      setForm((current) => ({ ...current, type, attributes: nextAttributes }));
+    }
+
+    setVariantDrafts([]);
+    setVariantBuilderError("");
+  }
+
   function generateVariantDrafts() {
     setVariantBuilderError("");
-    const selectedAttributes = variantAttributeIds
-      .map((id) => attributes.find((attribute) => attribute._id === id))
-      .filter((attribute): attribute is Attribute => Boolean(attribute));
-
-    if (selectedAttributes.length === 0) {
+    if (variantAttributes.length === 0) {
       setVariantBuilderError("Select at least one variant attribute.");
       return;
     }
 
-    const selections = selectedAttributes.map((attribute) => ({
+    const selections = variantAttributes.map((attribute) => ({
       name: attribute.name,
       values: variantSelections[attribute._id] ?? [],
     }));
@@ -640,7 +709,6 @@ export default function AdminProductsPage() {
         compareAtPrice: "",
         costPrice: "",
         trackInventory: true,
-        stockQuantity: "0",
         lowStockThreshold: form.lowStockThreshold || "5",
       })),
     );
@@ -680,15 +748,15 @@ export default function AdminProductsPage() {
     setPrimaryImageIndex(0);
   }
 
-  function clearImageSelection() {
+  const clearImageSelection = useCallback(() => {
     imagePreviewRef.current.forEach((preview) => URL.revokeObjectURL(preview));
     imagePreviewRef.current = [];
     setImagePreviews([]);
     setSelectedImages([]);
     setPrimaryImageIndex(0);
-  }
+  }, []);
 
-  function openCreate() {
+  const openCreate = useCallback(() => {
     setEditingId(null);
     setActiveWizardStep(0);
     clearImageSelection();
@@ -699,16 +767,41 @@ export default function AdminProductsPage() {
     const defaultWarehouse = warehouses.find(
       (warehouse) => warehouse.isDefault,
     );
+    const searchParams = new URLSearchParams(window.location.search);
+    const fromProcurement = searchParams.get("source") === "procurement";
     setForm({
       ...initialForm,
+      name: searchParams.get("name") ?? initialForm.name,
+      status: fromProcurement ? "ACTIVE" : initialForm.status,
+      visibility: fromProcurement ? "HIDDEN" : initialForm.visibility,
       type:
-        new URLSearchParams(window.location.search).get("type") === "VARIABLE"
-          ? "VARIABLE"
-          : initialForm.type,
-      inventoryWarehouseId: defaultWarehouse?._id ?? "",
+        searchParams.get("type") === "VARIABLE" ? "VARIABLE" : initialForm.type,
+      inventoryWarehouseId:
+        searchParams.get("warehouseId") ?? defaultWarehouse?._id ?? "",
     });
     setModalOpen(true);
-  }
+    void loadActiveAttributes().catch((loadError: unknown) => {
+      setRelatedOptionsError((current) => {
+        const attributeError = `attributes: ${errorMessage(loadError)}`;
+        return current ? `${current} • ${attributeError}` : attributeError;
+      });
+    });
+  }, [clearImageSelection, loadActiveAttributes, warehouses]);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("create") !== "1") {
+      return;
+    }
+
+    void Promise.resolve().then(() => {
+      openCreate();
+      window.history.replaceState(
+        window.history.state,
+        "",
+        window.location.pathname,
+      );
+    });
+  }, [openCreate]);
 
   async function openEdit(product: Product) {
     setEditingId(product._id);
@@ -758,7 +851,7 @@ export default function AdminProductsPage() {
       const missingAttribute = attributes.find((attribute) => {
         if (
           !attribute.isRequired ||
-          (form.type === "VARIABLE" && attribute.isVariant)
+          isSelectedVariantAttribute(form, attribute, variantAttributeIds)
         ) {
           return false;
         }
@@ -910,7 +1003,7 @@ export default function AdminProductsPage() {
     const missingRequiredAttribute = attributes.find((attribute) => {
       if (
         !attribute.isRequired ||
-        (form.type === "VARIABLE" && attribute.isVariant)
+        isSelectedVariantAttribute(form, attribute, variantAttributeIds)
       ) {
         return false;
       }
@@ -948,7 +1041,6 @@ export default function AdminProductsPage() {
             : Number(draft.compareAtPrice);
         const variantCostPrice =
           draft.costPrice.trim() === "" ? undefined : Number(draft.costPrice);
-        const quantity = Number(draft.stockQuantity);
         const threshold = Number(draft.lowStockThreshold);
         const optionKey = JSON.stringify(
           Object.entries(draft.options)
@@ -970,8 +1062,6 @@ export default function AdminProductsPage() {
               variantCompareAtPrice < variantPrice)) ||
           (variantCostPrice !== undefined &&
             (!Number.isFinite(variantCostPrice) || variantCostPrice < 0)) ||
-          !Number.isSafeInteger(quantity) ||
-          quantity < 0 ||
           !Number.isSafeInteger(threshold) ||
           threshold < 0 ||
           optionCombinations.has(optionKey) ||
@@ -984,7 +1074,7 @@ export default function AdminProductsPage() {
 
         if (invalid) {
           setVariantBuilderError(
-            `Check the title, option combination, SKU, price, and stock values for variant ${index + 1}.`,
+            `Check the title, option combination, SKU, price, and low-stock threshold for variant ${index + 1}.`,
           );
         }
         return invalid;
@@ -1005,7 +1095,6 @@ export default function AdminProductsPage() {
           ? { costPrice: Number(draft.costPrice) }
           : {}),
         trackInventory: draft.trackInventory,
-        stockQuantity: draft.trackInventory ? Number(draft.stockQuantity) : 0,
         lowStockThreshold: draft.trackInventory
           ? Number(draft.lowStockThreshold)
           : 0,
@@ -1574,7 +1663,7 @@ export default function AdminProductsPage() {
                   <th className="px-5 py-4">Category</th>
                   <th className="px-5 py-4">Type</th>
                   <th className="px-5 py-4">Price</th>
-                  <th className="px-5 py-4">Stock</th>
+                  <th className="px-5 py-4">Stock (All Warehouses)</th>
                   <th className="px-5 py-4">Status</th>
                   <th className="px-5 py-4 text-right">Actions</th>
                 </tr>
@@ -1633,7 +1722,8 @@ export default function AdminProductsPage() {
                         )}
                       </td>
                       <td className="px-5 py-4">
-                        {product.trackInventory === false
+                        {product.type !== "VARIABLE" &&
+                        product.trackInventory === false
                           ? "Not tracked"
                           : (product.stockQuantity ?? 0)}
                       </td>
@@ -1803,7 +1893,7 @@ export default function AdminProductsPage() {
                     <select
                       value={form.type}
                       onChange={(event) =>
-                        updateForm("type", event.target.value as ProductType)
+                        changeProductType(event.target.value as ProductType)
                       }
                       className={inputClass}
                     >
@@ -2398,8 +2488,8 @@ export default function AdminProductsPage() {
                   <div>
                     <span className={labelClass}>Product attributes</span>
                     <p className="text-xs text-gray-500">
-                      Choose attributes from your catalog. Variant attributes
-                      are marked for variable products.
+                      Choose attribute names here. For variable products, choose
+                      their values in the Variants step.
                     </p>
                   </div>
 
@@ -2412,10 +2502,31 @@ export default function AdminProductsPage() {
                         );
                         if (!attribute) return;
 
-                        updateForm("attributes", {
-                          ...form.attributes,
-                          [attribute.slug]: getAttributeInitialValue(attribute),
-                        });
+                        const isVariantOption =
+                          form.type === "VARIABLE" &&
+                          (attribute.type === "SELECT" ||
+                            attribute.type === "MULTI_SELECT") &&
+                          attribute.options.length > 0;
+
+                        if (isVariantOption) {
+                          setVariantAttributeIds((current) =>
+                            current.includes(attribute._id)
+                              ? current
+                              : [...current, attribute._id],
+                          );
+                          setVariantSelections((current) => ({
+                            ...current,
+                            [attribute._id]: [],
+                          }));
+                          setVariantDrafts([]);
+                          setVariantBuilderError("");
+                        } else {
+                          updateForm("attributes", {
+                            ...form.attributes,
+                            [attribute.slug]:
+                              getAttributeInitialValue(attribute),
+                          });
+                        }
                       }}
                       className={inputClass}
                     >
@@ -2426,7 +2537,7 @@ export default function AdminProductsPage() {
                             !Object.prototype.hasOwnProperty.call(
                               form.attributes,
                               attribute.slug,
-                            ),
+                            ) && !variantAttributeIds.includes(attribute._id),
                         )
                         .map((attribute) => (
                           <option key={attribute._id} value={attribute._id}>
@@ -2439,11 +2550,17 @@ export default function AdminProductsPage() {
                   </Field>
 
                   {attributes
-                    .filter((attribute) =>
-                      Object.prototype.hasOwnProperty.call(
-                        form.attributes,
-                        attribute.slug,
-                      ),
+                    .filter(
+                      (attribute) =>
+                        Object.prototype.hasOwnProperty.call(
+                          form.attributes,
+                          attribute.slug,
+                        ) ||
+                        isSelectedVariantAttribute(
+                          form,
+                          attribute,
+                          variantAttributeIds,
+                        ),
                     )
                     .map((attribute) => {
                       const value = form.attributes[attribute.slug];
@@ -2458,98 +2575,112 @@ export default function AdminProductsPage() {
                           key={attribute._id}
                           className="grid gap-3 rounded-lg border p-3 dark:border-gray-700 sm:grid-cols-[1fr_auto] sm:items-end"
                         >
-                          <Field label={attribute.name}>
-                            {attribute.type === "SELECT" ? (
-                              <select
-                                value={typeof value === "string" ? value : ""}
-                                onChange={(event) =>
-                                  updateAttributeValue(event.target.value)
-                                }
-                                className={inputClass}
-                              >
-                                <option value="">
-                                  Choose {attribute.name}
-                                </option>
-                                {attribute.options.map((option) => (
-                                  <option key={option} value={option}>
-                                    {option}
+                          {isSelectedVariantAttribute(
+                            form,
+                            attribute,
+                            variantAttributeIds,
+                          ) ? (
+                            <div>
+                              <span className={labelClass}>
+                                {attribute.name}
+                              </span>
+                            </div>
+                          ) : (
+                            <Field label={attribute.name}>
+                              {attribute.type === "SELECT" ? (
+                                <select
+                                  value={typeof value === "string" ? value : ""}
+                                  onChange={(event) =>
+                                    updateAttributeValue(event.target.value)
+                                  }
+                                  className={inputClass}
+                                >
+                                  <option value="">
+                                    Choose {attribute.name}
                                   </option>
-                                ))}
-                              </select>
-                            ) : attribute.type === "MULTI_SELECT" ? (
-                              <select
-                                multiple
-                                size={Math.min(
-                                  Math.max(attribute.options.length, 2),
-                                  5,
-                                )}
-                                value={
-                                  Array.isArray(value) ? value.map(String) : []
-                                }
-                                onChange={(event) =>
-                                  updateAttributeValue(
-                                    Array.from(
-                                      event.currentTarget.selectedOptions,
-                                      (option) => option.value,
-                                    ),
-                                  )
-                                }
-                                className={inputClass}
-                              >
-                                {attribute.options.map((option) => (
-                                  <option key={option} value={option}>
-                                    {option}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : attribute.type === "BOOLEAN" ? (
-                              <select
-                                value={
-                                  typeof value === "boolean"
-                                    ? String(value)
-                                    : ""
-                                }
-                                onChange={(event) =>
-                                  updateAttributeValue(
-                                    event.target.value === "true",
-                                  )
-                                }
-                                className={inputClass}
-                              >
-                                <option value="">Choose an option</option>
-                                <option value="true">Yes</option>
-                                <option value="false">No</option>
-                              </select>
-                            ) : (
-                              <input
-                                type={
-                                  attribute.type === "NUMBER"
-                                    ? "number"
-                                    : "text"
-                                }
-                                step={
-                                  attribute.type === "NUMBER"
-                                    ? "any"
-                                    : undefined
-                                }
-                                value={
-                                  typeof value === "string" ||
-                                  typeof value === "number"
-                                    ? value
-                                    : ""
-                                }
-                                onChange={(event) =>
-                                  updateAttributeValue(
-                                    attribute.type === "NUMBER" &&
-                                      event.target.value !== ""
-                                      ? Number(event.target.value)
-                                      : event.target.value,
-                                  )
-                                }
-                                className={inputClass}
-                              />
-                            )}
-                          </Field>
+                                  {attribute.options.map((option) => (
+                                    <option key={option} value={option}>
+                                      {option}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : attribute.type === "MULTI_SELECT" ? (
+                                <select
+                                  multiple
+                                  size={Math.min(
+                                    Math.max(attribute.options.length, 2),
+                                    5,
+                                  )}
+                                  value={
+                                    Array.isArray(value)
+                                      ? value.map(String)
+                                      : []
+                                  }
+                                  onChange={(event) =>
+                                    updateAttributeValue(
+                                      Array.from(
+                                        event.currentTarget.selectedOptions,
+                                        (option) => option.value,
+                                      ),
+                                    )
+                                  }
+                                  className={inputClass}
+                                >
+                                  {attribute.options.map((option) => (
+                                    <option key={option} value={option}>
+                                      {option}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : attribute.type === "BOOLEAN" ? (
+                                <select
+                                  value={
+                                    typeof value === "boolean"
+                                      ? String(value)
+                                      : ""
+                                  }
+                                  onChange={(event) =>
+                                    updateAttributeValue(
+                                      event.target.value === "true",
+                                    )
+                                  }
+                                  className={inputClass}
+                                >
+                                  <option value="">Choose an option</option>
+                                  <option value="true">Yes</option>
+                                  <option value="false">No</option>
+                                </select>
+                              ) : (
+                                <input
+                                  type={
+                                    attribute.type === "NUMBER"
+                                      ? "number"
+                                      : "text"
+                                  }
+                                  step={
+                                    attribute.type === "NUMBER"
+                                      ? "any"
+                                      : undefined
+                                  }
+                                  value={
+                                    typeof value === "string" ||
+                                    typeof value === "number"
+                                      ? value
+                                      : ""
+                                  }
+                                  onChange={(event) =>
+                                    updateAttributeValue(
+                                      attribute.type === "NUMBER" &&
+                                        event.target.value !== ""
+                                        ? Number(event.target.value)
+                                        : event.target.value,
+                                    )
+                                  }
+                                  className={inputClass}
+                                />
+                              )}
+                            </Field>
+                          )}
                           <button
                             type="button"
                             disabled={attribute.isRequired}
@@ -2557,6 +2688,23 @@ export default function AdminProductsPage() {
                               const nextAttributes = { ...form.attributes };
                               delete nextAttributes[attribute.slug];
                               updateForm("attributes", nextAttributes);
+                              if (
+                                isSelectedVariantAttribute(
+                                  form,
+                                  attribute,
+                                  variantAttributeIds,
+                                )
+                              ) {
+                                setVariantAttributeIds((current) =>
+                                  current.filter((id) => id !== attribute._id),
+                                );
+                                setVariantSelections((current) => {
+                                  const next = { ...current };
+                                  delete next[attribute._id];
+                                  return next;
+                                });
+                                setVariantDrafts([]);
+                              }
                             }}
                             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                             aria-label={`Remove ${attribute.name}`}
@@ -2616,31 +2764,43 @@ export default function AdminProductsPage() {
                   <div className="border-b pb-2 dark:border-gray-700">
                     <h3 className="font-semibold">Product Variants</h3>
                     <p className="mt-1 text-xs text-gray-500">
-                      Build size/color combinations from your saved variant
-                      attributes, then set SKU, price, and stock per variant.
+                      Attributes selected in the Attributes step appear here.
+                      Choose their values, then set SKU, price, and stock per
+                      variant.
                     </p>
                   </div>
 
                   {variantAttributes.length === 0 ? (
                     <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-                      Create an active Select or Multi-select attribute marked
-                      as a variant option first.{" "}
-                      <Link
-                        href="/admin/attributes/new"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-medium underline"
-                      >
-                        Create variant attribute
-                      </Link>
+                      {attributes.some(
+                        (attribute) =>
+                          (attribute.type === "SELECT" ||
+                            attribute.type === "MULTI_SELECT") &&
+                          attribute.options.length > 0,
+                      ) ? (
+                        <>
+                          Add an active variant attribute in the Attributes step
+                          first.
+                        </>
+                      ) : (
+                        <>
+                          Create an active Select or Multi-select attribute
+                          marked as a variant option first.{" "}
+                          <Link
+                            href="/admin/attributes/new"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium underline"
+                          >
+                            Create variant attribute
+                          </Link>
+                        </>
+                      )}
                     </p>
                   ) : (
                     <>
                       <div className="space-y-3">
                         {variantAttributes.map((attribute) => {
-                          const checked = variantAttributeIds.includes(
-                            attribute._id,
-                          );
                           const selectedValues =
                             variantSelections[attribute._id] ?? [];
 
@@ -2649,57 +2809,39 @@ export default function AdminProductsPage() {
                               key={attribute._id}
                               className="rounded-lg border p-3 dark:border-gray-700"
                             >
-                              <label className="flex items-center gap-2 text-sm font-medium">
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={(event) => {
-                                    setVariantAttributeIds((current) =>
-                                      event.target.checked
-                                        ? [...current, attribute._id]
-                                        : current.filter(
-                                            (id) => id !== attribute._id,
-                                          ),
-                                    );
-                                    setVariantBuilderError("");
-                                  }}
-                                />
+                              <div className="text-sm font-medium">
                                 {attribute.name}
                                 <span className="text-xs font-normal text-gray-500">
-                                  {attribute.type === "MULTI_SELECT"
-                                    ? "Choose values"
-                                    : "Choose options"}
+                                  {" "}
+                                  Choose values
                                 </span>
-                              </label>
-                              {checked && (
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                  {attribute.options.map((option) => (
-                                    <label
-                                      key={option}
-                                      className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm dark:border-gray-700"
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={selectedValues.includes(
-                                          option,
-                                        )}
-                                        onChange={(event) =>
-                                          setVariantSelections((current) => ({
-                                            ...current,
-                                            [attribute._id]: event.target
-                                              .checked
-                                              ? [...selectedValues, option]
-                                              : selectedValues.filter(
-                                                  (value) => value !== option,
-                                                ),
-                                          }))
-                                        }
-                                      />
-                                      {option}
-                                    </label>
-                                  ))}
-                                </div>
-                              )}
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {attribute.options.map((option) => (
+                                  <label
+                                    key={option}
+                                    className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm dark:border-gray-700"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedValues.includes(option)}
+                                      onChange={(event) => {
+                                        setVariantSelections((current) => ({
+                                          ...current,
+                                          [attribute._id]: event.target.checked
+                                            ? [...selectedValues, option]
+                                            : selectedValues.filter(
+                                                (value) => value !== option,
+                                              ),
+                                        }));
+                                        setVariantDrafts([]);
+                                        setVariantBuilderError("");
+                                      }}
+                                    />
+                                    {option}
+                                  </label>
+                                ))}
+                              </div>
                             </div>
                           );
                         })}
@@ -2854,23 +2996,6 @@ export default function AdminProductsPage() {
                                   updateVariantDraft(
                                     index,
                                     "costPrice",
-                                    event.target.value,
-                                  )
-                                }
-                                className={inputClass}
-                              />
-                            </Field>
-                            <Field label="Initial stock">
-                              <input
-                                type="number"
-                                min={0}
-                                step={1}
-                                disabled={!variant.trackInventory}
-                                value={variant.stockQuantity}
-                                onChange={(event) =>
-                                  updateVariantDraft(
-                                    index,
-                                    "stockQuantity",
                                     event.target.value,
                                   )
                                 }

@@ -56,6 +56,12 @@ export interface OrderItem {
   variantName?: string;
   imageUrl?: string;
   quantity: number;
+  trackInventory?: boolean;
+  allowOverselling?: boolean;
+  inventoryAllocations?: Array<{
+    warehouseId: Types.ObjectId;
+    quantity: number;
+  }>;
   fulfilledQuantity: number;
   returnedQuantity: number;
   unitPrice: number;
@@ -91,6 +97,7 @@ export interface Order {
   status: OrderStatus;
   totals: OrderTotals;
   notes?: string;
+  internalNote?: string;
   cancellationReason?: string;
   cancelledAt?: Date;
   confirmedAt?: Date;

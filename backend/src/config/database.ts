@@ -66,6 +66,21 @@ const databaseOptions: ConnectOptions = {
 
 const databaseConnection: Connection = mongoose.connection;
 
+async function assertTransactionSupport(): Promise<void> {
+  const database = databaseConnection.db;
+
+  if (!database) {
+    throw new Error("MongoDB connected without an active database handle.");
+  }
+
+  const topology = await database.admin().command({ hello: 1 });
+  if (!topology.setName && topology.msg !== "isdbgrid") {
+    throw new Error(
+      "MongoDB transactions require a replica set or sharded cluster. Configure MONGODB_URI to connect to one.",
+    );
+  }
+}
+
 /*
 |--------------------------------------------------------------------------
 | Connect Database
@@ -80,6 +95,7 @@ export const connectDatabase = async (): Promise<void> => {
         */
 
   if (isDatabaseConnected || databaseConnection.readyState === 1) {
+    await assertTransactionSupport();
     isDatabaseConnected = true;
 
     logger.debug("MongoDB connection already established.");
@@ -110,7 +126,8 @@ export const connectDatabase = async (): Promise<void> => {
 
   connectionPromise = mongoose
     .connect(env.MONGODB_URI, databaseOptions)
-    .then(() => {
+    .then(async () => {
+      await assertTransactionSupport();
       isDatabaseConnected = true;
 
       logger.info(

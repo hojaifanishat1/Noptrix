@@ -104,6 +104,14 @@ const checkoutItemSnapshotSchema = new Schema(
         message: "Quantity must be an integer.",
       },
     },
+    trackInventory: {
+      type: Boolean,
+      required: true,
+    },
+    allowOverselling: {
+      type: Boolean,
+      required: true,
+    },
     unitPrice: {
       type: Number,
       required: true,

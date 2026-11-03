@@ -595,14 +595,6 @@ export const ADMIN_NAVIGATION_SECTIONS: readonly AdminNavigationSection[] = [
         icon: MessageCircle,
         permission: "questions.read",
       },
-      {
-        id: "low-stock",
-        label: "Low Stock",
-        href: "/admin/low-stock",
-        icon: PackageCheck,
-        permission: "inventory.read",
-        badgeKey: "lowStock",
-      },
     ],
   },
 

@@ -47,6 +47,7 @@ import settingsRoutes from "../modules/settings/settings.routes";
 import codRoutes from "../modules/cod/cod.routes";
 import transactionRoutes from "../modules/transactions/transaction.routes";
 import paymentRoutes from "../modules/payments/payment.routes";
+import paymentAdminRoutes from "../modules/payments/payment.admin.routes";
 import paymentMethodRoutes from "../modules/payment-methods/payment-method.routes";
 import webhookRoutes from "../modules/webhooks/webhook.routes";
 import { auditLogsRoutes } from "../modules/audit-logs/audit-log.routes";
@@ -63,6 +64,7 @@ import inventoryRoutes from "../modules/inventory/inventory.routes";
 import warehouseRoutes from "../modules/warehouses/warehouse.routes";
 
 import ordersRoutes from "../modules/orders/order.routes";
+import orderAdminRoutes from "../modules/orders/order.admin.routes";
 import cartRoutes from "../modules/cart/cart.routes";
 import checkoutRoutes from "../modules/checkout/checkout.routes";
 import addressesRoutes from "../modules/addresses/address.routes";
@@ -349,6 +351,7 @@ router.use("/checkout", checkoutRoutes);
 |--------------------------------------------------------------------------
 */
 
+router.use("/orders", orderAdminRoutes);
 router.use("/orders", ordersRoutes);
 
 router.use("/cancellations", cancellationsRoutes);
@@ -372,6 +375,7 @@ router.use("/refunds", refundsRoutes);
 */
 
 router.use("/payments", paymentRoutes);
+router.use("/payments", paymentAdminRoutes);
 
 router.use("/payment-methods", paymentMethodRoutes);
 
@@ -623,13 +627,13 @@ router.use("/currencies", currencyRoutes);
 
 router.use("/settings", settingsRoutes);
 
-router.use("/payments", paymentRoutes);
 
-router.use("/transactions", transactionRoutes);
 
-router.use("/payment-methods", paymentMethodRoutes);
 
-router.use("/webhooks", webhookRoutes);
+
+
+
+
 
 /*
   sessions

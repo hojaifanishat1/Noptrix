@@ -116,7 +116,7 @@ async function getPurchasableItem(input: AddCartItemInput) {
     input.quantity,
     trackInventory,
     stockQuantity,
-    product.inventoryPolicy,
+    variant ? "DENY" : product.inventoryPolicy,
   );
 
   return {

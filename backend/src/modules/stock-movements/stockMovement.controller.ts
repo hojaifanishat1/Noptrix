@@ -16,6 +16,10 @@ export const listStockMovementsController = asyncHandler(
         typeof req.query.productId === "string"
           ? req.query.productId
           : undefined,
+      variantId:
+        typeof req.query.variantId === "string"
+          ? req.query.variantId
+          : undefined,
       warehouseId:
         typeof req.query.warehouseId === "string"
           ? req.query.warehouseId

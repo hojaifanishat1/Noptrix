@@ -188,60 +188,63 @@ export const updateProductSchema = z
       })
       .strict(),
 
-    body: productBaseSchema.partial().superRefine((data, ctx) => {
-      if (
-        data.compareAtPrice !== undefined &&
-        data.price !== undefined &&
-        data.compareAtPrice <= data.price
-      ) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["compareAtPrice"],
-          message: "compareAtPrice must be greater than price",
-        });
-      }
+    body: productBaseSchema
+      .omit({ stockQuantity: true })
+      .partial()
+      .superRefine((data, ctx) => {
+        if (
+          data.compareAtPrice !== undefined &&
+          data.price !== undefined &&
+          data.compareAtPrice <= data.price
+        ) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["compareAtPrice"],
+            message: "compareAtPrice must be greater than price",
+          });
+        }
 
-      if (
-        data.salePrice !== undefined &&
-        data.salePrice !== null &&
-        data.price !== undefined &&
-        data.salePrice >= data.price
-      ) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["salePrice"],
-          message: "Sale price must be less than the regular price.",
-        });
-      }
+        if (
+          data.salePrice !== undefined &&
+          data.salePrice !== null &&
+          data.price !== undefined &&
+          data.salePrice >= data.price
+        ) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["salePrice"],
+            message: "Sale price must be less than the regular price.",
+          });
+        }
 
-      if (
-        data.saleStartsAt &&
-        data.saleEndsAt &&
-        data.saleStartsAt >= data.saleEndsAt
-      ) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["saleEndsAt"],
-          message: "Sale end time must be later than its start time.",
-        });
-      }
+        if (
+          data.saleStartsAt &&
+          data.saleEndsAt &&
+          data.saleStartsAt >= data.saleEndsAt
+        ) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["saleEndsAt"],
+            message: "Sale end time must be later than its start time.",
+          });
+        }
 
-      if (data.publishAt && data.publishAt <= new Date()) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["publishAt"],
-          message: "Scheduled publish time must be in the future.",
-        });
-      }
+        if (data.publishAt && data.publishAt <= new Date()) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["publishAt"],
+            message: "Scheduled publish time must be in the future.",
+          });
+        }
 
-      if (data.publishAt && data.status === "INACTIVE") {
-        ctx.addIssue({
-          code: "custom",
-          path: ["status"],
-          message: "An inactive product cannot be scheduled for publication.",
-        });
-      }
-    }),
+        if (data.publishAt && data.status === "INACTIVE") {
+          ctx.addIssue({
+            code: "custom",
+            path: ["status"],
+            message: "An inactive product cannot be scheduled for publication.",
+          });
+        }
+      }),
   })
   .strict();
 

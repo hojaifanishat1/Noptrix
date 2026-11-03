@@ -80,7 +80,7 @@ const normalizePermissions = (permissions: PermissionValue): string[] => {
 */
 
 const isOwnerRequest = (req: Request): boolean => {
-  const role = req.adminAuth?.role;
+  const role = req.ownerAuth?.role ?? req.adminAuth?.role;
 
   return typeof role === "string" && role.trim().toUpperCase() === "OWNER";
 };
@@ -153,6 +153,17 @@ export const loadRolePermissions = async (
   ];
 };
 
+export const loadAuthenticatedPermissions: RequestHandler = (
+  req,
+  _res,
+  next,
+) => {
+  req.permissions = Object.freeze([
+    ...normalizePermissions(req.adminAuth?.permissions ?? []),
+  ]);
+  next();
+};
+
 /*
 |--------------------------------------------------------------------------
 | Get Request Permissions
@@ -202,13 +213,14 @@ export const attachPermissions = (
 | Supports:
 |
 | req.adminAuth
+| req.ownerAuth
 | req.auth
 |
 |--------------------------------------------------------------------------
 */
 
 const ensureAuthenticated = (req: Request, res: Response): boolean => {
-  if (!req.adminAuth && !req.auth) {
+  if (!req.adminAuth && !req.ownerAuth && !req.auth) {
     res.status(401).json({
       success: false,
       message: "Authentication required.",

@@ -90,7 +90,9 @@ export interface ProductInput {
   sortOrder?: number;
 }
 
-export type ProductUpdateInput = Partial<ProductInput>;
+export type ProductUpdateInput = Partial<
+  Omit<ProductInput, "stockQuantity" | "inventoryWarehouseId">
+>;
 
 export interface ProductListQuery {
   page?: number;

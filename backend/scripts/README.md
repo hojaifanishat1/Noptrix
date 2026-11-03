@@ -17,3 +17,18 @@ registered by the seed. The OWNER must explicitly assign the required permission
 non-owner roles; `settings.manage` is required for security settings.
 
 Do not commit owner credentials to source control.
+
+After deploying the inventory/catalog stock synchronization change, run this
+once from the `backend` directory to reconcile existing products with their
+warehouse inventory totals:
+
+```bash
+npx tsx scripts/sync-product-stock.ts
+```
+
+Before deploying warehouse-level variant inventory, run the index migration
+once from the `backend` directory:
+
+```bash
+npx tsx scripts/migrate-inventory-variant-index.ts
+```

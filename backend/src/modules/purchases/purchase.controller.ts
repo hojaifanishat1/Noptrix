@@ -91,6 +91,24 @@ export const updatePurchaseController = asyncHandler(
   },
 );
 
+export const linkPurchaseItemProductController = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const purchase = await purchaseService.linkPurchaseItemToProduct(
+      String(req.params.id),
+      String(req.params.itemId),
+      req.body.productId,
+      req.body.variantId,
+      getAuthenticatedAdminId(req),
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Purchase item linked to product successfully.",
+      data: purchase,
+    });
+  },
+);
+
 export const approvePurchaseController = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
     const adminId = getAuthenticatedAdminId(req);

@@ -105,16 +105,20 @@ function buildPublicProductFilter(filters: ProductSearchFilters) {
       ...(Array.isArray(existingAnd) ? existingAnd : []),
       {
         $or: [
-          { trackInventory: false },
+          { type: { $ne: "VARIABLE" }, trackInventory: false },
           { stockQuantity: { $gt: 0 } },
-          { inventoryPolicy: "CONTINUE" },
+          { type: { $ne: "VARIABLE" }, inventoryPolicy: "CONTINUE" },
         ],
       },
     ];
   } else if (filters.inStock === false) {
-    query.trackInventory = true;
+    const existingAnd = query.$and;
+    query.$and = [
+      ...(Array.isArray(existingAnd) ? existingAnd : []),
+      { $or: [{ type: "VARIABLE" }, { trackInventory: true }] },
+      { $or: [{ type: "VARIABLE" }, { inventoryPolicy: "DENY" }] },
+    ];
     query.stockQuantity = { $lte: 0 };
-    query.inventoryPolicy = "DENY";
   }
 
   return query;

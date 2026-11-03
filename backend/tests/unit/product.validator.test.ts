@@ -124,4 +124,12 @@ describe("create product inventory validation", () => {
       );
     }
   });
+
+  it("requires stock changes to go through inventory management", () => {
+    const result = updateProductSchema.shape.body.safeParse({
+      stockQuantity: 25,
+    });
+
+    expect(result.success).toBe(false);
+  });
 });

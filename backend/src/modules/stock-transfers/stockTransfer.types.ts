@@ -13,6 +13,7 @@ export type StockTransferStatus = (typeof STOCK_TRANSFER_STATUSES)[number];
 
 export interface CreateStockTransferInput {
   productId: string;
+  variantId?: string;
   sourceWarehouseId: string;
   destinationWarehouseId: string;
   quantity: number;

@@ -2,14 +2,17 @@ import mongoose, { Types } from "mongoose";
 
 import { ApiError } from "../../utils/ApiError";
 import { InventoryModel } from "../inventory/inventory.model";
-import { assertStockReferences } from "../inventory/inventory.service";
+import {
+  assertStockReferences,
+  getDefaultLowStockThreshold,
+  getProductStockCapacity,
+  syncInventoryStockQuantity,
+} from "../inventory/inventory.service";
 import { StockMovementModel } from "./stockMovement.model";
 import type {
   CreateStockMovementInput,
   StockMovementFilters,
 } from "./stockMovement.types";
-
-const DEFAULT_LOW_STOCK_THRESHOLD = 5;
 
 function assertObjectId(value: string, label: string): void {
   if (!Types.ObjectId.isValid(value)) {
@@ -92,12 +95,14 @@ function validateMovementInput(input: CreateStockMovementInput): void {
 
 async function getOrCreateInventory(
   productId: Types.ObjectId,
+  variantId: Types.ObjectId | undefined,
   warehouseId: Types.ObjectId,
   session: mongoose.ClientSession,
   allowCreate: boolean,
 ) {
   const inventory = await InventoryModel.findOne({
     productId,
+    ...(variantId ? { variantId } : { variantId: { $exists: false } }),
     warehouseId,
   })
     .session(session)
@@ -109,14 +114,19 @@ async function getOrCreateInventory(
     throw ApiError.conflict("Insufficient stock.");
   }
 
+  const lowStockThreshold = await getDefaultLowStockThreshold(
+    variantId,
+    session,
+  );
   const [created] = await InventoryModel.create(
     [
       {
         productId,
+        ...(variantId ? { variantId } : {}),
         warehouseId,
         quantity: 0,
         reservedQuantity: 0,
-        lowStockThreshold: DEFAULT_LOW_STOCK_THRESHOLD,
+        lowStockThreshold,
       },
     ],
     { session },
@@ -184,6 +194,11 @@ export async function listStockMovements(filters: StockMovementFilters) {
     query.productId = new Types.ObjectId(filters.productId);
   }
 
+  if (filters.variantId) {
+    assertObjectId(filters.variantId, "variantId");
+    query.variantId = new Types.ObjectId(filters.variantId);
+  }
+
   if (filters.warehouseId) {
     assertObjectId(filters.warehouseId, "warehouseId");
     query.warehouseId = new Types.ObjectId(filters.warehouseId);
@@ -234,6 +249,7 @@ export async function listStockMovements(filters: StockMovementFilters) {
   const [items, total] = await Promise.all([
     StockMovementModel.find(query)
       .populate("productId")
+      .populate("variantId")
       .populate("warehouseId")
       .populate("destinationWarehouseId")
       .populate("createdBy", "name email")
@@ -264,6 +280,7 @@ export async function getStockMovement(id: string) {
 
   const movement = await StockMovementModel.findById(id)
     .populate("productId")
+    .populate("variantId")
     .populate("warehouseId")
     .populate("destinationWarehouseId")
     .populate("createdBy", "name email")
@@ -286,6 +303,9 @@ export async function createStockMovement(
 
   const adminObjectId = new Types.ObjectId(adminId);
   const productObjectId = new Types.ObjectId(input.productId);
+  const variantObjectId = input.variantId
+    ? new Types.ObjectId(input.variantId)
+    : undefined;
   const sourceWarehouseId = new Types.ObjectId(input.warehouseId);
   const destinationWarehouseId = input.destinationWarehouseId
     ? new Types.ObjectId(input.destinationWarehouseId)
@@ -310,23 +330,49 @@ export async function createStockMovement(
     await session.withTransaction(async () => {
       // Recheck within the transaction so reference checks and stock
       // mutations participate in the same transaction.
-      await assertStockReferences(productObjectId, sourceWarehouseId, session);
+      await assertStockReferences(
+        productObjectId,
+        sourceWarehouseId,
+        session,
+        variantObjectId,
+      );
 
       if (destinationWarehouseId) {
         await assertStockReferences(
           productObjectId,
           destinationWarehouseId,
           session,
+          variantObjectId,
         );
       }
 
       const source = await getOrCreateInventory(
         productObjectId,
+        variantObjectId,
         sourceWarehouseId,
         session,
         input.type === "IN" ||
           (input.type === "ADJUSTMENT" && input.quantity > 0),
       );
+
+      if (
+        variantObjectId &&
+        input.quantity > 0 &&
+        (input.type === "IN" || input.type === "ADJUSTMENT")
+      ) {
+        const capacity = await getProductStockCapacity(
+          productObjectId.toHexString(),
+          session,
+        );
+        if (
+          capacity.allocatedQuantity + input.quantity >
+          capacity.totalStockLimit
+        ) {
+          throw ApiError.conflict(
+            `Variant stock exceeds the product's received stock limit. Available to allocate: ${capacity.availableToAllocate}.`,
+          );
+        }
+      }
 
       const sourceBefore = source.quantity;
       const sourceReservedBefore = source.reservedQuantity;
@@ -365,6 +411,7 @@ export async function createStockMovement(
 
         const destination = await getOrCreateInventory(
           productObjectId,
+          variantObjectId,
           destinationWarehouseId,
           session,
           true,
@@ -404,6 +451,7 @@ export async function createStockMovement(
         [
           {
             productId: productObjectId,
+            ...(variantObjectId ? { variantId: variantObjectId } : {}),
             warehouseId: sourceWarehouseId,
             destinationWarehouseId,
             type: input.type,
@@ -428,6 +476,12 @@ export async function createStockMovement(
       if (!movement) {
         throw ApiError.conflict("Stock movement record could not be created.");
       }
+
+      await syncInventoryStockQuantity(
+        productObjectId,
+        variantObjectId,
+        session,
+      );
 
       result = movement;
     });

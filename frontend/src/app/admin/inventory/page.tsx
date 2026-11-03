@@ -34,10 +34,10 @@ const labelClass =
   "mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300";
 
 function getName(
-  value: string | { _id: string; name?: string; code?: string },
+  value: string | { _id: string; name?: string; code?: string; title?: string },
 ): string {
   if (typeof value === "string") return value;
-  return value.name || value.code || value._id;
+  return value.name || value.title || value.code || value._id;
 }
 
 function getStatus(item: Inventory): InventoryStatus {
@@ -569,6 +569,11 @@ export default function AdminInventoryPage() {
                         <p className="font-medium text-gray-900 dark:text-white">
                           {getName(item.productId)}
                         </p>
+                        {item.variantId && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Variant: {getName(item.variantId)}
+                          </p>
+                        )}
                         <p className="mt-1 text-xs text-gray-500">
                           {typeof item.productId === "string"
                             ? item.productId

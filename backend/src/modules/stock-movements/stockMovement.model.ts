@@ -16,6 +16,7 @@ export type StockMovementType = (typeof STOCK_MOVEMENT_TYPES)[number];
 
 export interface StockMovement {
   productId: mongoose.Types.ObjectId;
+  variantId?: mongoose.Types.ObjectId;
   warehouseId: mongoose.Types.ObjectId;
   destinationWarehouseId?: mongoose.Types.ObjectId;
 
@@ -36,7 +37,7 @@ export interface StockMovement {
   referenceType?: string;
   referenceId?: mongoose.Types.ObjectId;
   idempotencyKey?: string;
-  createdBy: mongoose.Types.ObjectId;
+  createdBy?: mongoose.Types.ObjectId;
   createdAt: Date;
 }
 
@@ -48,6 +49,11 @@ const stockMovementSchema = new Schema<StockMovement>(
       type: Schema.Types.ObjectId,
       ref: "Product",
       required: true,
+      immutable: true,
+    },
+    variantId: {
+      type: Schema.Types.ObjectId,
+      ref: "ProductVariant",
       immutable: true,
     },
     warehouseId: {
@@ -131,7 +137,6 @@ const stockMovementSchema = new Schema<StockMovement>(
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "Admin",
-      required: true,
       immutable: true,
     },
   },

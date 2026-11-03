@@ -6,6 +6,7 @@ import type {
   InventoryAdjustmentInput,
   InventoryFilters,
   InventoryListResult,
+  ProductStockCapacity,
   WarehouseOption,
 } from "@/features/inventory/inventory.types";
 
@@ -41,9 +42,7 @@ function getPagination(
     total: Number(meta.total ?? fallback.total),
     totalPages: Number(meta.totalPages ?? fallback.totalPages),
     hasNextPage: Boolean(meta.hasNextPage ?? fallback.hasNextPage),
-    hasPreviousPage: Boolean(
-      meta.hasPreviousPage ?? fallback.hasPreviousPage,
-    ),
+    hasPreviousPage: Boolean(meta.hasPreviousPage ?? fallback.hasPreviousPage),
   };
 }
 
@@ -56,13 +55,18 @@ export const inventoryAdminApi = {
       productId: filters.productId || undefined,
       stockStatus: filters.stockStatus || undefined,
     };
-    const response = await apiClient.get<ApiResponse<Inventory[] | {
-      items: Inventory[];
-      pagination?: PaginationMeta;
-    }>>("/inventory", { params });
+    const response = await apiClient.get<
+      ApiResponse<
+        | Inventory[]
+        | {
+            items: Inventory[];
+            pagination?: PaginationMeta;
+          }
+      >
+    >("/inventory", { params });
 
     const payload = getPayload(response);
-    const items = Array.isArray(payload) ? payload : payload?.items ?? [];
+    const items = Array.isArray(payload) ? payload : (payload?.items ?? []);
     const embeddedPagination = Array.isArray(payload)
       ? undefined
       : payload?.pagination;
@@ -91,6 +95,15 @@ export const inventoryAdminApi = {
     return getPayload(response);
   },
 
+  async getProductStockCapacity(
+    productId: string,
+  ): Promise<ProductStockCapacity> {
+    const response = await apiClient.get<ApiResponse<ProductStockCapacity>>(
+      `/inventory/products/${productId}/stock-capacity`,
+    );
+    return getPayload(response);
+  },
+
   async updateThreshold(
     id: string,
     lowStockThreshold: number,
@@ -114,13 +127,18 @@ export const inventoryAdminApi = {
   },
 
   async warehouses(): Promise<WarehouseOption[]> {
-    const response = await apiClient.get<ApiResponse<WarehouseOption[] | {
-      items: WarehouseOption[];
-    }>>("/warehouses", {
+    const response = await apiClient.get<
+      ApiResponse<
+        | WarehouseOption[]
+        | {
+            items: WarehouseOption[];
+          }
+      >
+    >("/warehouses", {
       params: { page: 1, limit: 100, status: "ACTIVE" },
     });
 
     const payload = getPayload(response);
-    return Array.isArray(payload) ? payload : payload?.items ?? [];
+    return Array.isArray(payload) ? payload : (payload?.items ?? []);
   },
 };

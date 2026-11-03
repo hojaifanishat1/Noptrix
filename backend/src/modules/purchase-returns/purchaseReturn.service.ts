@@ -3,6 +3,7 @@ import mongoose, { Types } from "mongoose";
 import { ApiError } from "../../utils/ApiError";
 import { PurchaseModel } from "../purchases/purchase.model";
 import { InventoryModel } from "../inventory/inventory.model";
+import { syncInventoryStockQuantity } from "../inventory/inventory.service";
 import { StockMovementModel } from "../stock-movements/stockMovement.model";
 
 import { PurchaseReturnModel } from "./purchaseReturn.model";
@@ -143,7 +144,7 @@ async function prepareReturnItems(
   purchase: {
     _id: Types.ObjectId;
     items: Array<{
-      productId: Types.ObjectId;
+      productId?: Types.ObjectId;
       variantId?: Types.ObjectId;
       sku?: string;
       productName: string;
@@ -169,13 +170,13 @@ async function prepareReturnItems(
   for (const input of inputItems) {
     const purchaseItem = purchase.items.find(
       (item) =>
-        String(item.productId) === input.productId &&
+        String(item.productId ?? "") === input.productId &&
         String(item.variantId ?? "") === String(input.variantId ?? ""),
     );
 
-    if (!purchaseItem) {
+    if (!purchaseItem?.productId) {
       throw ApiError.badRequest(
-        `Product ${input.productId} is not part of this purchase.`,
+        `Linked product ${input.productId} is not part of this purchase.`,
       );
     }
 
@@ -605,6 +606,9 @@ export async function completePurchaseReturn(
 
         const inventory = await InventoryModel.findOne({
           productId: item.productId,
+          ...(item.variantId
+            ? { variantId: item.variantId }
+            : { variantId: { $exists: false } }),
           warehouseId: record.warehouseId,
         })
           .session(session)
@@ -633,6 +637,7 @@ export async function completePurchaseReturn(
           [
             {
               productId: item.productId,
+              ...(item.variantId ? { variantId: item.variantId } : {}),
               warehouseId: record.warehouseId,
               type: "OUT",
               quantity: item.quantity,
@@ -645,6 +650,12 @@ export async function completePurchaseReturn(
             },
           ],
           { session },
+        );
+
+        await syncInventoryStockQuantity(
+          item.productId,
+          item.variantId,
+          session,
         );
       }
 

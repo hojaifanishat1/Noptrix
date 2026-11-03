@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "vitest run",
+    "predev": "docker volume create noptrix_redis_data && docker compose up -d --wait --wait-timeout 30 redis",
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "build": "tsc",

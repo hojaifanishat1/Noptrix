@@ -197,6 +197,7 @@ const permissions = [
   ["loyalty", "read", "loyalty.read"],
   ["marketing", "read", "marketing.read"],
   ["orders", "read", "orders.read"],
+  ["orders", "update", "orders.update"],
   ["payment_methods", "read", "payment_methods.read"],
   ["payment_reports", "read", "payment_reports.read"],
   ["payments", "read", "payments.read"],

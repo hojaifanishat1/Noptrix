@@ -11,6 +11,7 @@ const quantity = z
 export const createStockMovementSchema = z
   .object({
     productId: objectId,
+    variantId: objectId.optional(),
     warehouseId: objectId,
     destinationWarehouseId: objectId.optional(),
     type: z.enum(["IN", "OUT", "ADJUSTMENT", "TRANSFER"]),
@@ -56,6 +57,7 @@ export const createStockMovementSchema = z
 
 export const stockMovementQuerySchema = z.object({
   productId: objectId.optional(),
+  variantId: objectId.optional(),
   warehouseId: objectId.optional(),
   destinationWarehouseId: objectId.optional(),
   type: z.enum(["IN", "OUT", "ADJUSTMENT", "TRANSFER"]).optional(),

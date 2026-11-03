@@ -7,6 +7,7 @@ import mongoose, {
 
 export interface Inventory {
   productId: mongoose.Types.ObjectId;
+  variantId?: mongoose.Types.ObjectId;
   warehouseId: mongoose.Types.ObjectId;
   quantity: number;
   reservedQuantity: number;
@@ -23,6 +24,11 @@ const inventorySchema = new Schema<Inventory>(
       type: Schema.Types.ObjectId,
       ref: "Product",
       required: true,
+      immutable: true,
+    },
+    variantId: {
+      type: Schema.Types.ObjectId,
+      ref: "ProductVariant",
       immutable: true,
     },
     warehouseId: {
@@ -72,8 +78,8 @@ const inventorySchema = new Schema<Inventory>(
 );
 
 inventorySchema.index(
-  { productId: 1, warehouseId: 1 },
-  { unique: true, name: "uniq_inventory_product_warehouse" },
+  { productId: 1, variantId: 1, warehouseId: 1 },
+  { unique: true, name: "uniq_inventory_product_variant_warehouse" },
 );
 inventorySchema.index(
   { warehouseId: 1, updatedAt: -1 },

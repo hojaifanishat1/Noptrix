@@ -5,7 +5,7 @@ import { userAuth, requireUser } from "../../middlewares/userAuth.middleware";
 import { ownerOrAdminAuth } from "../../middlewares/ownerOrAdminAuth.middleware";
 
 import {
-  loadRolePermissions,
+  loadAuthenticatedPermissions,
   requirePermission,
 } from "../../middlewares/permission.middleware";
 
@@ -31,7 +31,7 @@ router.get("/my/:transactionId", userAuth, requireUser, getMyTransactionById);
 router.get(
   "/admin",
   ownerOrAdminAuth,
-  loadRolePermissions,
+  loadAuthenticatedPermissions,
   requirePermission("transactions.read"),
   getAdminTransactions,
 );

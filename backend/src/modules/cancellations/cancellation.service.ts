@@ -3,6 +3,7 @@ import mongoose, { Types } from "mongoose";
 
 import { ApiError } from "../../utils/ApiError";
 import { OrderModel } from "../orders/order.model";
+import { releaseOrderInventoryAllocations } from "../orders/order.service";
 import { CancellationModel } from "./cancellation.model";
 
 import type {
@@ -265,6 +266,8 @@ export const reviewCancellation = async (
             "The order is no longer eligible for cancellation.",
           );
         }
+
+        await releaseOrderInventoryAllocations(order, session);
 
         order.status = "CANCELLED";
         order.cancellationReason =

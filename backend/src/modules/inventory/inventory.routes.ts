@@ -5,11 +5,13 @@ import { validate } from "../../middlewares/validation.middleware";
 import {
   listInventoryController,
   getInventoryController,
+  getProductStockCapacityController,
   setLowStockThresholdController,
   adjustInventoryController,
 } from "./inventory.controller";
 import {
   inventoryIdParamsSchema,
+  inventoryProductParamsSchema,
   inventoryListQuerySchema,
   setLowStockThresholdSchema,
   inventoryAdjustmentSchema,
@@ -51,6 +53,13 @@ router.get(
   requireInventoryPermission("inventory.read"),
   validate(inventoryListQuerySchema, "query"),
   listInventoryController,
+);
+
+router.get(
+  "/products/:productId/stock-capacity",
+  requireInventoryPermission("inventory.read"),
+  validate(inventoryProductParamsSchema, "params"),
+  getProductStockCapacityController,
 );
 
 router.get(

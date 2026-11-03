@@ -3,7 +3,7 @@ import { Router } from "express";
 import { ownerOrAdminAuth } from "../../middlewares/ownerOrAdminAuth.middleware";
 
 import {
-  loadRolePermissions,
+  loadAuthenticatedPermissions,
   requirePermission,
 } from "../../middlewares/permission.middleware";
 
@@ -29,7 +29,7 @@ router.get("/", getPaymentMethods);
 router.get(
   "/admin",
   ownerOrAdminAuth,
-  loadRolePermissions,
+  loadAuthenticatedPermissions,
   requirePermission("payment_methods.manage"),
   getAdminPaymentMethods,
 );
@@ -41,7 +41,7 @@ router.get(
 router.patch(
   "/admin/:methodId",
   ownerOrAdminAuth,
-  loadRolePermissions,
+  loadAuthenticatedPermissions,
   requirePermission("payment_methods.manage"),
   updateAdminPaymentMethod,
 );

@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useState,
-  type FormEvent,
-} from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   AlertCircle,
   Check,
@@ -102,8 +97,9 @@ export default function AdminWarehousesPage() {
   const [totalPages, setTotalPages] = useState(0);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingWarehouse, setEditingWarehouse] =
-    useState<Warehouse | null>(null);
+  const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(
+    null,
+  );
   const [form, setForm] = useState<WarehouseInput>(initialForm);
 
   const loadWarehouses = useCallback(async () => {
@@ -189,10 +185,14 @@ export default function AdminWarehousesPage() {
       return;
     }
 
-    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(form.code.trim()) ||
-        form.code.trim().length < 2 ||
-        form.code.trim().length > 32) {
-      setError("Code must be 2–32 characters and use letters, numbers, _ or -.");
+    if (
+      !/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(form.code.trim()) ||
+      form.code.trim().length < 2 ||
+      form.code.trim().length > 32
+    ) {
+      setError(
+        "Code must be 2–32 characters and use letters, numbers, _ or -.",
+      );
       return;
     }
 
@@ -471,9 +471,7 @@ export default function AdminWarehousesPage() {
           <h2 className="font-semibold text-gray-900 dark:text-white">
             Warehouses
           </h2>
-          <span className="text-sm text-gray-500">
-            {total} total
-          </span>
+          <span className="text-sm text-gray-500">{total} total</span>
         </div>
 
         {loading ? (
@@ -515,7 +513,10 @@ export default function AdminWarehousesPage() {
 
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {warehouses.map((warehouse) => (
-                    <tr key={warehouse._id} className="hover:bg-gray-50/70 dark:hover:bg-gray-800/40">
+                    <tr
+                      key={warehouse._id}
+                      className="hover:bg-gray-50/70 dark:hover:bg-gray-800/40"
+                    >
                       <td className="px-4 py-4">
                         <div className="flex items-start gap-2">
                           <div className="rounded-lg bg-blue-50 p-2 text-blue-600 dark:bg-blue-950/40">
@@ -555,7 +556,9 @@ export default function AdminWarehousesPage() {
                       <td className="px-4 py-4 text-gray-600 dark:text-gray-300">
                         <p>{warehouse.contactName || "—"}</p>
                         <p className="mt-1 text-xs text-gray-500">
-                          {warehouse.contactPhone || warehouse.contactEmail || "—"}
+                          {warehouse.contactPhone ||
+                            warehouse.contactEmail ||
+                            "—"}
                         </p>
                       </td>
 
@@ -697,7 +700,9 @@ export default function AdminWarehousesPage() {
                         minLength={2}
                         maxLength={120}
                         value={form.name}
-                        onChange={(event) => updateField("name", event.target.value)}
+                        onChange={(event) =>
+                          updateField("name", event.target.value)
+                        }
                         className={inputClass}
                         placeholder="Main warehouse"
                       />
@@ -710,7 +715,9 @@ export default function AdminWarehousesPage() {
                         minLength={2}
                         maxLength={32}
                         value={form.code}
-                        onChange={(event) => updateField("code", event.target.value.toUpperCase())}
+                        onChange={(event) =>
+                          updateField("code", event.target.value.toUpperCase())
+                        }
                         className={inputClass}
                         placeholder="WH-MAIN"
                       />
@@ -722,7 +729,9 @@ export default function AdminWarehousesPage() {
                         rows={3}
                         maxLength={1000}
                         value={form.description}
-                        onChange={(event) => updateField("description", event.target.value)}
+                        onChange={(event) =>
+                          updateField("description", event.target.value)
+                        }
                         className={inputClass}
                         placeholder="Warehouse description..."
                       />
@@ -740,7 +749,9 @@ export default function AdminWarehousesPage() {
                       <input
                         maxLength={300}
                         value={form.address}
-                        onChange={(event) => updateField("address", event.target.value)}
+                        onChange={(event) =>
+                          updateField("address", event.target.value)
+                        }
                         className={inputClass}
                         placeholder="Street address"
                       />
@@ -751,7 +762,9 @@ export default function AdminWarehousesPage() {
                       <input
                         maxLength={100}
                         value={form.city}
-                        onChange={(event) => updateField("city", event.target.value)}
+                        onChange={(event) =>
+                          updateField("city", event.target.value)
+                        }
                         className={inputClass}
                       />
                     </div>
@@ -761,7 +774,9 @@ export default function AdminWarehousesPage() {
                       <input
                         maxLength={100}
                         value={form.state}
-                        onChange={(event) => updateField("state", event.target.value)}
+                        onChange={(event) =>
+                          updateField("state", event.target.value)
+                        }
                         className={inputClass}
                       />
                     </div>
@@ -771,7 +786,9 @@ export default function AdminWarehousesPage() {
                       <input
                         maxLength={20}
                         value={form.postalCode}
-                        onChange={(event) => updateField("postalCode", event.target.value)}
+                        onChange={(event) =>
+                          updateField("postalCode", event.target.value)
+                        }
                         className={inputClass}
                       />
                     </div>
@@ -781,7 +798,9 @@ export default function AdminWarehousesPage() {
                       <input
                         maxLength={100}
                         value={form.country}
-                        onChange={(event) => updateField("country", event.target.value)}
+                        onChange={(event) =>
+                          updateField("country", event.target.value)
+                        }
                         className={inputClass}
                       />
                     </div>
@@ -798,7 +817,9 @@ export default function AdminWarehousesPage() {
                       <input
                         maxLength={120}
                         value={form.contactName}
-                        onChange={(event) => updateField("contactName", event.target.value)}
+                        onChange={(event) =>
+                          updateField("contactName", event.target.value)
+                        }
                         className={inputClass}
                       />
                     </div>
@@ -806,10 +827,13 @@ export default function AdminWarehousesPage() {
                     <div>
                       <label className={labelClass}>Contact phone</label>
                       <input
+                        type="tel"
                         minLength={5}
                         maxLength={32}
                         value={form.contactPhone}
-                        onChange={(event) => updateField("contactPhone", event.target.value)}
+                        onChange={(event) =>
+                          updateField("contactPhone", event.target.value)
+                        }
                         className={inputClass}
                       />
                     </div>
@@ -820,7 +844,9 @@ export default function AdminWarehousesPage() {
                         type="email"
                         maxLength={254}
                         value={form.contactEmail}
-                        onChange={(event) => updateField("contactEmail", event.target.value)}
+                        onChange={(event) =>
+                          updateField("contactEmail", event.target.value)
+                        }
                         className={inputClass}
                         placeholder="warehouse@example.com"
                       />
@@ -860,7 +886,9 @@ export default function AdminWarehousesPage() {
                         type="checkbox"
                         checked={form.isDefault}
                         disabled={form.status !== "ACTIVE"}
-                        onChange={(event) => updateField("isDefault", event.target.checked)}
+                        onChange={(event) =>
+                          updateField("isDefault", event.target.checked)
+                        }
                         className="h-4 w-4 rounded border-gray-300 text-blue-600"
                       />
                       <span>

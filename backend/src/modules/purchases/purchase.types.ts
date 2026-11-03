@@ -22,7 +22,8 @@ export const PURCHASE_PAYMENT_STATUSES = [
 export type PurchasePaymentStatus = (typeof PURCHASE_PAYMENT_STATUSES)[number];
 
 export interface PurchaseItem {
-  productId: Types.ObjectId;
+  _id?: Types.ObjectId;
+  productId?: Types.ObjectId;
   variantId?: Types.ObjectId;
   sku?: string;
   productName: string;
@@ -52,6 +53,7 @@ export interface PurchaseReceivingEntry {
   _id?: Types.ObjectId;
   items: Array<{
     productId: Types.ObjectId;
+    variantId?: Types.ObjectId;
     quantity: number;
   }>;
   note?: string;
@@ -101,7 +103,9 @@ export interface Purchase {
 }
 
 export interface CreatePurchaseItemInput {
-  productId: string;
+  productId?: string;
+  productName?: string;
+  sku?: string;
   variantId?: string;
   quantity: number;
   unitCost: number;
@@ -149,6 +153,7 @@ export interface PurchaseFilters {
 
 export interface ReceivePurchaseItemInput {
   productId: string;
+  variantId?: string;
   quantity: number;
 }
 

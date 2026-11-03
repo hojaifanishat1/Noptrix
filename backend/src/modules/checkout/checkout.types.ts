@@ -41,6 +41,8 @@ export interface CheckoutItemSnapshot {
   productName: string;
   variantName?: string;
   quantity: number;
+  trackInventory: boolean;
+  allowOverselling: boolean;
   unitPrice: number;
   compareAtPrice?: number;
   currency: string;

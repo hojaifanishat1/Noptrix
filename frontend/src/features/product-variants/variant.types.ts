@@ -34,7 +34,6 @@ export interface VariantInput {
   compareAtPrice?: number;
   costPrice?: number;
   trackInventory?: boolean;
-  stockQuantity?: number;
   lowStockThreshold?: number;
   status?: VariantStatus;
   sortOrder?: number;

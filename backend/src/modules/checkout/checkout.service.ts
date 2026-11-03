@@ -7,6 +7,7 @@ import { AddressModel } from "../addresses/address.model";
 import type { Address } from "../addresses/address.types";
 import { CartModel } from "../cart/cart.model";
 import type { CartItem } from "../cart/cart.types";
+import { InventoryModel } from "../inventory/inventory.model";
 import { ProductModel } from "../products/product.model";
 import ProductVariantModel from "../product-variants/variant.model";
 import type { ProductVariantDocument } from "../product-variants/variant.model";
@@ -114,16 +115,39 @@ const getPurchasableItem = async (
     ? variant.trackInventory
     : product.trackInventory;
 
-  const stockQuantity = Number(
-    variant ? variant.stockQuantity : product.stockQuantity,
-  );
-
   const inventoryPolicy = product.inventoryPolicy;
+
+  let availableQuantity = 0;
+  if (trackInventory) {
+    const inventoryQuery = InventoryModel.aggregate<{ available: number }>([
+      {
+        $match: {
+          productId: product._id,
+          ...(variant
+            ? { variantId: variant._id }
+            : { variantId: { $exists: false } }),
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          available: {
+            $sum: { $subtract: ["$quantity", "$reservedQuantity"] },
+          },
+        },
+      },
+    ]);
+
+    if (session) inventoryQuery.session(session);
+
+    const [inventory] = await inventoryQuery.exec();
+    availableQuantity = inventory?.available ?? 0;
+  }
 
   if (
     trackInventory &&
-    inventoryPolicy !== "CONTINUE" &&
-    (!Number.isFinite(stockQuantity) || quantity > stockQuantity)
+    (variant || inventoryPolicy !== "CONTINUE") &&
+    (!Number.isSafeInteger(availableQuantity) || quantity > availableQuantity)
   ) {
     throw ApiError.badRequest(`Insufficient stock for "${product.name}".`);
   }
@@ -145,6 +169,9 @@ const getPurchasableItem = async (
     productName: String(product.name),
     ...(variant?.title ? { variantName: String(variant.title) } : {}),
     quantity,
+    trackInventory,
+    allowOverselling:
+      trackInventory && !variant && product.inventoryPolicy === "CONTINUE",
     unitPrice: roundMoney(price),
     ...((variant?.compareAtPrice ?? product.compareAtPrice) != null
       ? {

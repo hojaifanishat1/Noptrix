@@ -115,6 +115,38 @@ const orderItemSchema = new Schema(
         message: "Quantity must be an integer.",
       },
     },
+    trackInventory: {
+      type: Boolean,
+      default: true,
+    },
+    allowOverselling: {
+      type: Boolean,
+      default: false,
+    },
+    inventoryAllocations: {
+      type: [
+        new Schema(
+          {
+            warehouseId: {
+              type: Schema.Types.ObjectId,
+              ref: "Warehouse",
+              required: true,
+            },
+            quantity: {
+              type: Number,
+              required: true,
+              min: 1,
+              validate: {
+                validator: Number.isSafeInteger,
+                message: "Allocation quantity must be a safe integer.",
+              },
+            },
+          },
+          { _id: false, strict: "throw" },
+        ),
+      ],
+      default: [],
+    },
     fulfilledQuantity: {
       type: Number,
       default: 0,
@@ -293,6 +325,11 @@ const orderSchema = new Schema<Order>(
       required: true,
     },
     notes: {
+      type: String,
+      trim: true,
+      maxlength: 2000,
+    },
+    internalNote: {
       type: String,
       trim: true,
       maxlength: 2000,

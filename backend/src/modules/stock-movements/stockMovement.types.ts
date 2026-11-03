@@ -2,6 +2,7 @@ import type { StockMovementType } from "./stockMovement.model";
 
 export interface CreateStockMovementInput {
   productId: string;
+  variantId?: string;
   warehouseId: string;
   destinationWarehouseId?: string;
   type: StockMovementType;
@@ -15,6 +16,7 @@ export interface CreateStockMovementInput {
 
 export interface StockMovementFilters {
   productId?: string;
+  variantId?: string;
   warehouseId?: string;
   destinationWarehouseId?: string;
   type?: StockMovementType;

@@ -11,14 +11,27 @@ const quantitySchema = z.number().int().positive().max(1_000_000);
 
 const purchaseItemSchema = z
   .object({
-    productId: objectIdSchema,
+    productId: objectIdSchema.optional(),
+    productName: z.string().trim().min(2).max(250).optional(),
+    sku: z.string().trim().min(1).max(100).optional(),
     variantId: objectIdSchema.optional(),
     quantity: quantitySchema,
     unitCost: moneySchema,
     discountAmount: moneySchema.optional().default(0),
     taxRate: z.number().finite().min(0).max(100).optional().default(0),
   })
-  .strict();
+  .strict()
+  .refine(
+    (item) => Boolean(item.productId) !== Boolean(item.productName?.trim()),
+    {
+      message: "Select a catalog product or enter a new product name.",
+      path: ["productId"],
+    },
+  )
+  .refine((item) => !item.variantId || Boolean(item.productId), {
+    message: "A variant must belong to a catalog product.",
+    path: ["variantId"],
+  });
 
 const purchaseFields = {
   supplierId: objectIdSchema,
@@ -60,6 +73,18 @@ export const purchaseIdSchema = z.object({
   id: objectIdSchema,
 });
 
+export const purchaseItemProductParamsSchema = z.object({
+  id: objectIdSchema,
+  itemId: objectIdSchema,
+});
+
+export const linkPurchaseItemProductSchema = z
+  .object({
+    productId: objectIdSchema,
+    variantId: objectIdSchema.optional(),
+  })
+  .strict();
+
 export const purchaseQuerySchema = z
   .object({
     search: z.string().trim().max(200).optional(),
@@ -93,6 +118,7 @@ export const receivePurchaseSchema = z
         z
           .object({
             productId: objectIdSchema,
+            variantId: objectIdSchema.optional(),
             quantity: quantitySchema,
           })
           .strict(),

@@ -2,10 +2,15 @@ import mongoose, { Types } from "mongoose";
 
 import { ApiError } from "../../utils/ApiError";
 import ProductModel from "../products/product.model";
+import ProductVariantModel from "../product-variants/variant.model";
 import { ensureSupplierCanReceivePurchase } from "../suppliers/supplier.service";
 import WarehouseModel from "../warehouses/warehouse.model";
 import { InventoryModel } from "../inventory/inventory.model";
-import { assertStockReferences } from "../inventory/inventory.service";
+import {
+  assertStockReferences,
+  getDefaultLowStockThreshold,
+  syncInventoryStockQuantity,
+} from "../inventory/inventory.service";
 import { StockMovementModel } from "../stock-movements/stockMovement.model";
 import { PurchaseModel } from "./purchase.model";
 
@@ -166,24 +171,72 @@ async function prepareItems(
   const prepared = [];
 
   for (const item of input) {
-    const product = await productModel
-      .findById(item.productId)
-      .select("_id name sku currency status trackInventory")
-      .session(session ?? null)
-      .lean()
-      .exec();
+    const product = item.productId
+      ? await productModel
+          .findById(item.productId)
+          .select("_id name sku currency status trackInventory type")
+          .session(session ?? null)
+          .lean()
+          .exec()
+      : null;
 
-    if (!product) {
+    if (item.productId && !product) {
       throw ApiError.notFound(`Product not found: ${item.productId}.`);
     }
 
-    if (item.variantId && !mongoose.isValidObjectId(item.variantId)) {
+    const variant =
+      item.variantId && item.productId
+        ? await ProductVariantModel.findOne({
+            _id: item.variantId,
+            productId: item.productId,
+            status: "ACTIVE",
+          })
+            .select("_id title sku trackInventory")
+            .session(session ?? null)
+            .lean()
+            .exec()
+        : null;
+
+    if (item.variantId && !variant) {
+      throw ApiError.notFound("Active product variant not found.");
+    }
+
+    if (product?.type === "VARIABLE" && !variant) {
+      throw ApiError.badRequest(
+        `Select a variant for variable product "${product.name}".`,
+      );
+    }
+
+    if (product && product.type !== "VARIABLE" && variant) {
+      throw ApiError.badRequest("Only variable products can have variants.");
+    }
+    if (variant && !variant.trackInventory) {
+      throw ApiError.badRequest(
+        `Inventory tracking is disabled for variant "${variant.title}".`,
+      );
+    }
+
+    if (
+      item.variantId &&
+      (!product || !mongoose.isValidObjectId(item.variantId))
+    ) {
       throw ApiError.badRequest("Invalid product variant ID.");
     }
 
     if (item.discountAmount > item.quantity * item.unitCost) {
       throw ApiError.badRequest(
-        `Discount exceeds line subtotal for ${product.name}.`,
+        `Discount exceeds line subtotal for ${product?.name ?? item.productName}.`,
+      );
+    }
+
+    const productName = product
+      ? variant
+        ? `${product.name} - ${variant.title}`
+        : product.name
+      : item.productName?.trim();
+    if (!productName) {
+      throw ApiError.badRequest(
+        "Enter a product name when purchasing an item not in the catalog.",
       );
     }
 
@@ -192,12 +245,14 @@ async function prepareItems(
     const taxAmount = roundMoney((taxableAmount * item.taxRate) / 100);
 
     prepared.push({
-      productId: new Types.ObjectId(item.productId),
+      ...(item.productId
+        ? { productId: new Types.ObjectId(item.productId) }
+        : {}),
       ...(item.variantId
         ? { variantId: new Types.ObjectId(item.variantId) }
         : {}),
-      sku: "sku" in product ? product.sku : undefined,
-      productName: product.name,
+      sku: variant?.sku ?? product?.sku ?? (item.sku?.trim() || undefined),
+      productName,
       quantity: item.quantity,
       receivedQuantity: 0,
       unitCost: item.unitCost,
@@ -210,6 +265,104 @@ async function prepareItems(
   }
 
   return prepared;
+}
+
+export async function linkPurchaseItemToProduct(
+  purchaseId: string,
+  itemId: string,
+  productId: string,
+  variantId: string | undefined,
+  adminId: string,
+) {
+  assertObjectId(purchaseId, "purchase ID");
+  assertObjectId(itemId, "purchase item ID");
+  assertObjectId(productId, "product ID");
+  if (variantId) assertObjectId(variantId, "variant ID");
+  const adminObjectId = assertAdminId(adminId);
+
+  const purchase = await PurchaseModel.findById(purchaseId)
+    .select("+auditTrail")
+    .exec();
+
+  if (!purchase) throw ApiError.notFound("Purchase not found.");
+  if (purchase.status === "CANCELLED" || purchase.status === "RECEIVED") {
+    throw ApiError.conflict(
+      "Products can only be linked to open purchase items.",
+    );
+  }
+
+  const item = purchase.items.find(
+    (purchaseItem) => String(purchaseItem._id) === itemId,
+  );
+
+  if (!item) throw ApiError.notFound("Purchase item not found.");
+  if (item.productId) {
+    throw ApiError.conflict(
+      "This purchase item is already linked to a product.",
+    );
+  }
+  if (item.receivedQuantity > 0) {
+    throw ApiError.conflict("A received purchase item cannot be relinked.");
+  }
+
+  const product = await ProductModel.findById(productId)
+    .select("_id name sku status type")
+    .lean()
+    .exec();
+
+  if (!product) throw ApiError.notFound("Product not found.");
+  if (product.status === "ARCHIVED") {
+    throw ApiError.conflict(
+      "An archived product cannot be linked to a purchase.",
+    );
+  }
+
+  const variant = variantId
+    ? await ProductVariantModel.findOne({
+        _id: variantId,
+        productId: product._id,
+        status: "ACTIVE",
+      })
+        .select("_id title sku trackInventory")
+        .lean()
+        .exec()
+    : null;
+
+  if (variantId && !variant) {
+    throw ApiError.notFound("Active product variant not found.");
+  }
+  if (product.type === "VARIABLE" && !variant) {
+    throw ApiError.badRequest("Select a variant for this variable product.");
+  }
+  if (product.type !== "VARIABLE" && variant) {
+    throw ApiError.badRequest("Only variable products can have variants.");
+  }
+  if (variant && !variant.trackInventory) {
+    throw ApiError.badRequest(
+      "Inventory tracking is disabled for this variant.",
+    );
+  }
+
+  item.productId = product._id;
+  item.variantId = variant?._id;
+  item.productName = variant
+    ? `${product.name} - ${variant.title}`
+    : product.name;
+  item.sku = item.sku || variant?.sku || product.sku;
+  purchase.updatedBy = adminObjectId;
+  addAudit(
+    purchase,
+    "UPDATED",
+    adminObjectId,
+    `Purchase item linked to catalog product ${product.name}.`,
+    {
+      purchaseItemId: String(item._id),
+      productId: product._id.toHexString(),
+    },
+  );
+
+  await purchase.save();
+  return purchase.toObject();
 }
 
 function toPlainPurchase(purchase: unknown) {
@@ -573,32 +726,53 @@ export async function receivePurchase(
 
       await ensureWarehouseActive(String(purchase.warehouseId), session);
 
-      const receivedByProduct = new Map<string, number>();
+      const receivedByStockItem = new Map<
+        string,
+        { productId: string; variantId?: string; quantity: number }
+      >();
 
       for (const receivedItem of input.items) {
         assertObjectId(receivedItem.productId, "product ID");
+        if (receivedItem.variantId) {
+          assertObjectId(receivedItem.variantId, "variant ID");
+        }
 
-        const key = receivedItem.productId;
-        receivedByProduct.set(
-          key,
-          (receivedByProduct.get(key) ?? 0) + receivedItem.quantity,
-        );
+        const key = `${receivedItem.productId}:${receivedItem.variantId ?? ""}`;
+        const existing = receivedByStockItem.get(key);
+        receivedByStockItem.set(key, {
+          productId: receivedItem.productId,
+          ...(receivedItem.variantId
+            ? { variantId: receivedItem.variantId }
+            : {}),
+          quantity: (existing?.quantity ?? 0) + receivedItem.quantity,
+        });
       }
 
       const receivingRecordId = new Types.ObjectId();
       const receivedItems: Array<{
         productId: Types.ObjectId;
+        variantId?: Types.ObjectId;
         quantity: number;
       }> = [];
 
-      for (const [productId, quantity] of receivedByProduct) {
+      for (const {
+        productId,
+        variantId,
+        quantity,
+      } of receivedByStockItem.values()) {
+        const productObjectId = new Types.ObjectId(productId);
+        const variantObjectId = variantId
+          ? new Types.ObjectId(variantId)
+          : undefined;
         const matchingItems = purchase.items.filter(
-          (item) => String(item.productId) === productId,
+          (item) =>
+            String(item.productId) === productId &&
+            String(item.variantId ?? "") === (variantId ?? ""),
         );
 
         if (matchingItems.length === 0) {
           throw ApiError.badRequest(
-            `Product ${productId} is not part of this purchase.`,
+            `Product ${productId}${variantId ? ` variant ${variantId}` : ""} is not part of this purchase.`,
           );
         }
 
@@ -613,12 +787,11 @@ export async function receivePurchase(
           );
         }
 
-        const productObjectId = new Types.ObjectId(productId);
-
         await assertStockReferences(
           productObjectId,
           purchase.warehouseId,
           session,
+          variantObjectId,
         );
 
         let quantityToAllocate = quantity;
@@ -636,6 +809,9 @@ export async function receivePurchase(
 
         const inventory = await InventoryModel.findOne({
           productId: productObjectId,
+          ...(variantObjectId
+            ? { variantId: variantObjectId }
+            : { variantId: { $exists: false } }),
           warehouseId: purchase.warehouseId,
         })
           .session(session)
@@ -677,26 +853,32 @@ export async function receivePurchase(
             );
           }
         } else {
+          const lowStockThreshold = await getDefaultLowStockThreshold(
+            variantObjectId,
+            session,
+          );
           await InventoryModel.create(
             [
               {
                 productId: productObjectId,
+                ...(variantObjectId ? { variantId: variantObjectId } : {}),
                 warehouseId: purchase.warehouseId,
                 quantity: inventoryAfter,
                 reservedQuantity: 0,
-                lowStockThreshold: 5,
+                lowStockThreshold,
               },
             ],
             { session },
           );
         }
 
-        const idempotencyKey = `purchase:${purchase._id}:receive:${receivingRecordId}:${productId}`;
+        const idempotencyKey = `purchase:${purchase._id}:receive:${receivingRecordId}:${productId}:${variantId ?? "product"}`;
 
         await StockMovementModel.create(
           [
             {
               productId: productObjectId,
+              ...(variantObjectId ? { variantId: variantObjectId } : {}),
               warehouseId: purchase.warehouseId,
               type: "IN",
               quantity,
@@ -712,8 +894,15 @@ export async function receivePurchase(
           { session },
         );
 
+        await syncInventoryStockQuantity(
+          productObjectId,
+          variantObjectId,
+          session,
+        );
+
         receivedItems.push({
           productId: productObjectId,
+          ...(variantObjectId ? { variantId: variantObjectId } : {}),
           quantity,
         });
       }

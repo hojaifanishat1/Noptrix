@@ -435,20 +435,29 @@ export async function listProducts(
 
   if (query.inStock === true) {
     filter.$or = [
-      { trackInventory: false },
+      { type: { $ne: "VARIABLE" }, trackInventory: false },
       { stockQuantity: { $gt: 0 } },
-      { inventoryPolicy: "CONTINUE" },
+      { type: { $ne: "VARIABLE" }, inventoryPolicy: "CONTINUE" },
     ];
   } else if (query.inStock === false) {
-    filter.trackInventory = true;
+    filter.$or = [{ type: "VARIABLE" }, { trackInventory: true }];
     filter.stockQuantity = { $lte: 0 };
-    filter.inventoryPolicy = "DENY";
+    filter.$and = [
+      ...(Array.isArray(filter.$and)
+        ? (filter.$and as Record<string, unknown>[])
+        : []),
+      { $or: [{ type: "VARIABLE" }, { inventoryPolicy: "DENY" }] },
+    ];
   }
 
   if (query.search?.trim()) {
     const safeSearch = escapeRegex(query.search.trim());
 
+    const existingAnd = filter.$and;
     filter.$and = [
+      ...(Array.isArray(existingAnd)
+        ? (existingAnd as Record<string, unknown>[])
+        : []),
       {
         $or: [
           { name: { $regex: safeSearch, $options: "i" } },

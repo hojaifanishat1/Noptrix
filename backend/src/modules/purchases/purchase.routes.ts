@@ -14,6 +14,7 @@ import {
   getPurchaseController,
   getPurchaseSummaryController,
   listPurchasesController,
+  linkPurchaseItemProductController,
   orderPurchaseController,
   receivePurchaseController,
   recordPurchasePaymentController,
@@ -31,6 +32,8 @@ import {
   receivePurchaseSchema,
   recordPurchasePaymentSchema,
   updatePurchaseSchema,
+  linkPurchaseItemProductSchema,
+  purchaseItemProductParamsSchema,
 } from "./purchase.validator";
 
 const router = Router();
@@ -65,6 +68,13 @@ router.patch(
   validate(purchaseIdSchema, "params"),
   validate(updatePurchaseSchema),
   updatePurchaseController,
+);
+
+router.patch(
+  "/:id/items/:itemId/product",
+  validate(purchaseItemProductParamsSchema, "params"),
+  validate(linkPurchaseItemProductSchema),
+  linkPurchaseItemProductController,
 );
 
 // Workflow actions

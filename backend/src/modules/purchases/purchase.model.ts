@@ -11,7 +11,6 @@ const purchaseItemSchema = new Schema(
     productId: {
       type: Schema.Types.ObjectId,
       ref: "Product",
-      required: true,
     },
     variantId: {
       type: Schema.Types.ObjectId,
@@ -129,6 +128,10 @@ const purchaseReceivingSchema = new Schema(
           type: Schema.Types.ObjectId,
           required: true,
           ref: "Product",
+        },
+        variantId: {
+          type: Schema.Types.ObjectId,
+          ref: "ProductVariant",
         },
         quantity: {
           type: Number,

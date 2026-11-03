@@ -15,6 +15,7 @@ export interface StockTransfer {
   transferNumber: string;
 
   productId: mongoose.Types.ObjectId;
+  variantId?: mongoose.Types.ObjectId;
 
   sourceWarehouseId: mongoose.Types.ObjectId;
 
@@ -130,6 +131,11 @@ const stockTransferSchema = new Schema<StockTransfer>(
       type: Schema.Types.ObjectId,
       ref: "Product",
       required: true,
+      immutable: true,
+    },
+    variantId: {
+      type: Schema.Types.ObjectId,
+      ref: "ProductVariant",
       immutable: true,
     },
 
