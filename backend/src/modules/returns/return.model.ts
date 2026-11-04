@@ -87,6 +87,11 @@ const returnItemSchema = new Schema(
         message: "Accepted quantity must be an integer.",
       },
     },
+    inspectionNote: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+    },
   },
   { _id: false },
 );
@@ -177,6 +182,12 @@ const returnSchema = new Schema<ReturnRequest>(
     reviewedAt: Date,
 
     reviewNote: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+    },
+
+    inspectionNote: {
       type: String,
       trim: true,
       maxlength: 1000,

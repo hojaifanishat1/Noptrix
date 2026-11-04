@@ -213,10 +213,11 @@ export const listCustomerCancellations = async (
 export const reviewCancellation = async (
   cancellationIdInput: string,
   reviewerIdInput: string | Types.ObjectId,
+  reviewerRole: "OWNER" | "ADMIN",
   input: ReviewCancellationInput,
 ): Promise<Cancellation> => {
   const cancellationId = toObjectId(cancellationIdInput, "cancellation ID");
-  const reviewerId = normalizeUserId(reviewerIdInput);
+  const reviewerId = toObjectId(String(reviewerIdInput), "reviewer ID");
 
   const session = await mongoose.startSession();
 
@@ -287,6 +288,7 @@ export const reviewCancellation = async (
       }
 
       cancellation.reviewedBy = reviewerId;
+      cancellation.reviewedByRole = reviewerRole;
       cancellation.reviewedAt = new Date();
 
       if (input.reviewNote) {

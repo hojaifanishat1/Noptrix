@@ -190,7 +190,7 @@ export const listCustomerReturns = async (
 
 export const reviewReturn = async (
   returnId: string,
-  reviewerId: string,
+  reviewerId: string | undefined,
   input: ReviewReturnInput,
 ) => {
   const session = await mongoose.startSession();
@@ -212,7 +212,12 @@ export const reviewReturn = async (
         );
       }
 
-      returnRequest.reviewedBy = toObjectId(reviewerId);
+      // reviewedBy references Admin only. Owner IDs must never be
+      // stored in this Admin reference.
+      if (reviewerId) {
+        returnRequest.reviewedBy = toObjectId(reviewerId);
+      }
+
       returnRequest.reviewedAt = new Date();
       returnRequest.reviewNote = input.reviewNote;
 
@@ -305,17 +310,17 @@ export const inspectReturn = async (
 
         returnItem.receivedQuantity = inspection.receivedQuantity;
         returnItem.acceptedQuantity = inspection.acceptedQuantity;
+
+        if (inspection.inspectionNote !== undefined) {
+          returnItem.inspectionNote = inspection.inspectionNote;
+        }
       }
 
       returnRequest.status = "INSPECTING";
       returnRequest.inspectedAt = new Date();
 
-      if (input.reviewNote) {
-        const previousNote = returnRequest.reviewNote ?? "";
-        returnRequest.reviewNote = [previousNote, input.reviewNote]
-          .filter(Boolean)
-          .join("\n")
-          .slice(0, 1000);
+      if (input.inspectionNote !== undefined) {
+        returnRequest.inspectionNote = input.inspectionNote;
       }
 
       await returnRequest.save({ session });

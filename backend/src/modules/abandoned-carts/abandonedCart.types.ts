@@ -27,6 +27,8 @@ export interface AbandonedCart {
   abandonedAt: Date;
   recoveryTokenHash?: string;
   recoveryTokenExpiresAt?: Date;
+  emailClaimToken?: string;
+  emailClaimExpiresAt?: Date;
 
   emailSentAt?: Date;
   lastEmailAt?: Date;

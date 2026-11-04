@@ -97,7 +97,7 @@ export const cancelCustomerReturnController = asyncHandler(
  */
 export const reviewReturnController = asyncHandler(
   async (req: Request, res: Response) => {
-    const reviewerId = getAuthenticatedUserId(req);
+    const reviewerId = req.adminAuth?.adminId;
     const returnId = getParam(req.params.returnId);
 
     const result = await reviewReturn(
@@ -140,6 +140,61 @@ export const completeReturnController = asyncHandler(
     res.status(200).json({
       success: true,
       message: "Return request completed successfully.",
+      data: result,
+    });
+  },
+);
+
+import {
+  getAdminReturn,
+  getAdminReturnAnalytics,
+  listAdminReturns,
+} from "./return.admin.service";
+
+import type { ReturnStatus } from "./return.types";
+
+export const listAdminReturnsController = asyncHandler(
+  async (req: Request, res: Response) => {
+    const result = await listAdminReturns(
+      req.query as {
+        status?: ReturnStatus;
+        orderId?: string;
+        search?: string;
+        page?: number;
+        limit?: number;
+        sort?: "newest" | "oldest";
+      },
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Return requests retrieved successfully.",
+      data: result.items,
+      pagination: result.pagination,
+    });
+  },
+);
+
+export const getAdminReturnController = asyncHandler(
+  async (req: Request, res: Response) => {
+    const returnId = getParam(req.params.returnId);
+    const result = await getAdminReturn(returnId);
+
+    res.status(200).json({
+      success: true,
+      message: "Return request retrieved successfully.",
+      data: result,
+    });
+  },
+);
+
+export const getAdminReturnAnalyticsController = asyncHandler(
+  async (_req: Request, res: Response) => {
+    const result = await getAdminReturnAnalytics();
+
+    res.status(200).json({
+      success: true,
+      message: "Return analytics retrieved successfully.",
       data: result,
     });
   },

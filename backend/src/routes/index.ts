@@ -66,11 +66,16 @@ import warehouseRoutes from "../modules/warehouses/warehouse.routes";
 import ordersRoutes from "../modules/orders/order.routes";
 import orderAdminRoutes from "../modules/orders/order.admin.routes";
 import cartRoutes from "../modules/cart/cart.routes";
+import abandonedCartRoutes from "../modules/abandoned-carts/abandonedCart.routes";
 import checkoutRoutes from "../modules/checkout/checkout.routes";
+import checkoutAdminRoutes from "../modules/checkout/checkout.admin.routes";
 import addressesRoutes from "../modules/addresses/address.routes";
 import wishlistRoutes from "../modules/wishlist/wishlist.routes";
+import cancellationAdminRoutes from "../modules/cancellations/cancellation.admin.routes";
 import cancellationsRoutes from "../modules/cancellations/cancellation.routes";
 import returnsRoutes from "../modules/returns/return.routes";
+import returnAdminRoutes from "../modules/returns/return.admin.routes";
+import refundAdminRoutes from "../modules/refunds/refund.admin.routes";
 import refundsRoutes from "../modules/refunds/refund.routes";
 import shippingRoutes from "../modules/shipping/shipping.routes";
 import deliveryRoutes from "../modules/delivery/delivery.routes";
@@ -332,8 +337,11 @@ router.use("/addresses", addressesRoutes);
 
 router.use("/cart", cartRoutes);
 
+router.use("/abandoned-carts", abandonedCartRoutes);
+
 router.use("/wishlist", wishlistRoutes);
 
+router.use("/checkout", checkoutAdminRoutes);
 router.use("/checkout", checkoutRoutes);
 
 /*
@@ -354,10 +362,13 @@ router.use("/checkout", checkoutRoutes);
 router.use("/orders", orderAdminRoutes);
 router.use("/orders", ordersRoutes);
 
+router.use("/cancellations", cancellationAdminRoutes);
 router.use("/cancellations", cancellationsRoutes);
 
+router.use("/returns/admin", returnAdminRoutes);
 router.use("/returns", returnsRoutes);
 
+router.use("/refunds/admin", refundAdminRoutes);
 router.use("/refunds", refundsRoutes);
 /*
 |--------------------------------------------------------------------------

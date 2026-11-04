@@ -85,9 +85,20 @@ export const getCustomerCancellationController = asyncHandler(
  */
 export const reviewCancellationController = asyncHandler(
   async (req: Request, res: Response) => {
+    const ownerId = req.ownerAuth?.ownerId;
+    const adminId = req.adminAuth?.adminId;
+
+    const reviewerId = ownerId || adminId;
+    const reviewerRole = ownerId ? "OWNER" : adminId ? "ADMIN" : null;
+
+    if (!reviewerId || !reviewerRole) {
+      throw ApiError.unauthorized("Administrative authentication required.");
+    }
+
     const cancellation = await reviewCancellation(
       getParam(req, "cancellationId"),
-      getUserId(req),
+      reviewerId,
+      reviewerRole,
       req.body,
     );
 

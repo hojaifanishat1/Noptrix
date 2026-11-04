@@ -85,6 +85,16 @@ const abandonedCartSchema = new Schema<AbandonedCart>(
       type: Date,
     },
 
+    emailClaimToken: {
+      type: String,
+      select: false,
+    },
+
+    emailClaimExpiresAt: {
+      type: Date,
+      index: true,
+    },
+
     emailSentAt: {
       type: Date,
     },
@@ -134,6 +144,8 @@ abandonedCartSchema.index(
 abandonedCartSchema.index({ status: 1, abandonedAt: -1 });
 abandonedCartSchema.index({ userId: 1, status: 1, createdAt: -1 });
 abandonedCartSchema.index({ status: 1, lastEmailAt: 1 });
+abandonedCartSchema.index({ status: 1, emailClaimExpiresAt: 1 });
+
 
 export const AbandonedCartModel: Model<AbandonedCart> =
   (mongoose.models.AbandonedCart as Model<AbandonedCart> | undefined) ??

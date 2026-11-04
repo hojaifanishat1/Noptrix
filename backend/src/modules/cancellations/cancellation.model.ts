@@ -129,7 +129,11 @@ const cancellationSchema = new Schema<Cancellation>(
 
     reviewedBy: {
       type: Schema.Types.ObjectId,
-      ref: "Admin",
+    },
+
+    reviewedByRole: {
+      type: String,
+      enum: ["OWNER", "ADMIN"],
     },
 
     reviewedAt: Date,

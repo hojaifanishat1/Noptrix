@@ -47,6 +47,7 @@ export interface ReturnItem {
   evidenceUrls: string[];
   receivedQuantity: number;
   acceptedQuantity: number;
+  inspectionNote?: string;
 }
 
 export interface ReturnRequest {
@@ -71,6 +72,7 @@ export interface ReturnRequest {
   reviewedBy?: Types.ObjectId;
   reviewedAt?: Date;
   reviewNote?: string;
+  inspectionNote?: string;
 
   receivedAt?: Date;
   inspectedAt?: Date;
@@ -108,8 +110,9 @@ export interface InspectReturnInput {
     orderItemId: string;
     receivedQuantity: number;
     acceptedQuantity: number;
+    inspectionNote?: string;
   }>;
-  reviewNote?: string;
+  inspectionNote?: string;
 }
 
 export interface ReturnListFilters {

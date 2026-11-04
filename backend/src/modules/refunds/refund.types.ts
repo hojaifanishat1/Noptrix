@@ -30,40 +30,31 @@ export interface RefundTransaction {
   responseCode?: string;
   responseMessage?: string;
   processedAt?: Date;
+  manualReference?: string;
 }
 
 export interface Refund {
   _id?: Types.ObjectId;
-
   refundNumber: string;
-
   orderId: Types.ObjectId;
   userId: Types.ObjectId;
   paymentId?: Types.ObjectId;
   cancellationId?: Types.ObjectId;
   returnId?: Types.ObjectId;
-
   amount: number;
   currency: string;
-
   reason: RefundReason;
   customerNote?: string;
   internalNote?: string;
-
   status: RefundStatus;
-
   requestedBy?: Types.ObjectId;
   processedBy?: Types.ObjectId;
-
   transaction?: RefundTransaction;
-
   idempotencyKey: string;
-
   requestedAt: Date;
   processedAt?: Date;
   failedAt?: Date;
   cancelledAt?: Date;
-
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -81,6 +72,11 @@ export interface CreateRefundInput {
 
 export interface ProcessRefundInput {
   internalNote?: string;
+}
+
+export interface ManualRefundInput {
+  internalNote?: string;
+  manualReference: string;
 }
 
 export interface RefundListFilters {

@@ -31,8 +31,13 @@ const refundTransactionSchema = new Schema(
       maxlength: 1000,
     },
     processedAt: Date,
+    manualReference: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+    },
   },
-  { _id: false },
+  { _id: false, strict: "throw" },
 );
 
 const refundSchema = new Schema<Refund>(
@@ -77,8 +82,9 @@ const refundSchema = new Schema<Refund>(
       required: true,
       min: 0.01,
       validate: {
-        validator: Number.isFinite,
-        message: "Refund amount must be finite.",
+        validator: (value: number) =>
+          Number.isFinite(value) && Math.round(value * 100) === value * 100,
+        message: "Refund amount must be finite and have at most two decimals.",
       },
     },
     currency: {
@@ -88,6 +94,7 @@ const refundSchema = new Schema<Refund>(
       trim: true,
       minlength: 3,
       maxlength: 3,
+      match: /^[A-Z]{3}$/,
     },
     reason: {
       type: String,
@@ -147,10 +154,25 @@ const refundSchema = new Schema<Refund>(
 );
 
 refundSchema.index({ idempotencyKey: 1 }, { unique: true });
-
 refundSchema.index({ userId: 1, createdAt: -1 });
 refundSchema.index({ orderId: 1, status: 1 });
 refundSchema.index({ status: 1, createdAt: -1 });
+
+refundSchema.index(
+  { cancellationId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { cancellationId: { $type: "objectId" } },
+  },
+);
+
+refundSchema.index(
+  { returnId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { returnId: { $type: "objectId" } },
+  },
+);
 
 refundSchema.pre("validate", function () {
   if (this.status === "SUCCEEDED" && !this.processedAt) {
@@ -172,7 +194,10 @@ refundSchema.pre("validate", function () {
     );
   }
 
-  if (this.transaction?.status === "SUCCEEDED" && this.status !== "SUCCEEDED") {
+  if (
+    this.transaction &&
+    this.transaction.status !== this.status
+  ) {
     this.invalidate(
       "transaction.status",
       "Transaction status must match refund status.",
@@ -181,6 +206,7 @@ refundSchema.pre("validate", function () {
 });
 
 export const RefundModel =
-  (models.Refund as Model<Refund>) || model<Refund>("Refund", refundSchema);
+  (models.Refund as Model<Refund> | undefined) ??
+  model<Refund>("Refund", refundSchema);
 
 export default RefundModel;

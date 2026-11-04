@@ -53,6 +53,7 @@ export interface Cancellation {
   currency: string;
 
   reviewedBy?: Types.ObjectId;
+  reviewedByRole?: "OWNER" | "ADMIN";
   reviewedAt?: Date;
   reviewNote?: string;
 
