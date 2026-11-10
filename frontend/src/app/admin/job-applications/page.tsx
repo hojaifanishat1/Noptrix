@@ -35,6 +35,8 @@ import {
 } from "lucide-react";
 
 import { jobApplicationsApi } from "@/services/api/job-applications.api";
+import { ridersApi } from "@/services/api/riders.api";
+import { useAuthStore } from "@/stores/auth.store";
 import JobApplicationReviewForm from "@/features/job-applications/job-application-review-form";
 import { jobVacanciesApi } from "@/services/api/job-vacancies.api";
 
@@ -327,6 +329,8 @@ function getStatusCount(
 
 export default function JobApplicationsPage() {
     const router = useRouter();
+    const user = useAuthStore((state) => state.user);
+    const isOwner = user?.accountType === "OWNER";
 
     const [applications, setApplications] =
         useState<JobApplication[]>([]);
@@ -676,12 +680,6 @@ export default function JobApplicationsPage() {
                             ),
                     );
 
-                    if (input.status === "SELECTED") {
-                        goToEmployeeInvitation(
-                            router,
-                            applicationId,
-                        );
-                    }
                 } catch (error) {
                     setError(
                         getErrorMessage(error),
@@ -692,7 +690,78 @@ export default function JobApplicationsPage() {
                     );
                 }
             },
-            [router, updatingId],
+            [updatingId],
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Convert Selected Rider Applicant
+    |--------------------------------------------------------------------------
+    */
+
+    const convertApplicationToRider =
+        useCallback(
+            async (applicationId: string) => {
+                if (updatingId) return;
+
+                let riderCode = "";
+
+                if (isOwner) {
+                    const enteredCode = window.prompt(
+                        "Enter a unique Rider Code:",
+                        `RDR-${applicationId.slice(-6).toUpperCase()}`,
+                    );
+
+                    if (enteredCode === null) return;
+
+                    riderCode = enteredCode.trim();
+
+                    if (!riderCode) {
+                        setError("Rider Code is required.");
+                        return;
+                    }
+
+                    if (
+                        !window.confirm(
+                            `Convert this selected applicant directly into a PENDING Rider with code ${riderCode}?`,
+                        )
+                    ) {
+                        return;
+                    }
+                } else {
+                    if (
+                        !window.confirm(
+                            "Submit this selected applicant for owner approval to become a PENDING Rider?",
+                        )
+                    ) {
+                        return;
+                    }
+                }
+
+                setUpdatingId(applicationId);
+                setError("");
+
+                try {
+                    if (isOwner) {
+                        await ridersApi.convertApplication(
+                            applicationId,
+                            { riderCode },
+                        );
+                    } else {
+                        await jobApplicationsApi.requestRiderConversion(
+                            applicationId,
+                        );
+                    }
+
+                    await loadApplications();
+                } catch (error) {
+                    setError(getErrorMessage(error));
+                } finally {
+                    setUpdatingId(null);
+                }
+            },
+            [isOwner, loadApplications, updatingId],
         );
 
 
@@ -1339,6 +1408,10 @@ export default function JobApplicationsPage() {
                                                             application._id,
                                                         )
                                                     }
+                                                    onConvertToRider={
+                                                        convertApplicationToRider
+                                                    }
+                                                    isOwner={isOwner}
                                                 />
                                             );
                                         },
@@ -1419,6 +1492,10 @@ export default function JobApplicationsPage() {
                                             application._id,
                                         )
                                     }
+                                    onConvertToRider={
+                                        convertApplicationToRider
+                                    }
+                                    isOwner={isOwner}
                                 />
                             ),
                         )
@@ -1613,6 +1690,9 @@ interface ApplicationRowProps {
     onCreateEmployeeInvitation: (
         applicationId: string,
     ) => void;
+
+    onConvertToRider: (applicationId: string) => Promise<void>;
+    isOwner: boolean;
 }
 
 
@@ -1625,11 +1705,18 @@ function ApplicationRow({
     onToggle,
     onUpdateStatus,
     onCreateEmployeeInvitation,
+    onConvertToRider,
+    isOwner,
 }: ApplicationRowProps) {
     const vacancyTitle =
         getVacancyTitle(
             application,
         );
+
+    const isRiderVacancy =
+        application.vacancyId !== null &&
+        typeof application.vacancyId === "object" &&
+        application.vacancyId.vacancyType === "RIDER";
 
     return (
         <tr className="group">
@@ -1728,19 +1815,38 @@ function ApplicationRow({
 
                     <div className="px-5 py-4">
                         {application.status === "SELECTED" ? (
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    onCreateEmployeeInvitation(
-                                        application._id,
-                                    )
-                                }
-                                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                            >
-                                <UserPlus size={14} />
-
-                                Create invitation
-                            </button>
+                            isRiderVacancy ? (
+                                application.riderConversionRequestedAt && !isOwner ? (
+                                    <span className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                                        Awaiting owner approval
+                                    </span>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        disabled={isUpdating}
+                                        onClick={() => void onConvertToRider(application._id)}
+                                        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-gray-800 disabled:opacity-50"
+                                    >
+                                        <UserPlus size={14} />
+                                        {isUpdating
+                                            ? (isOwner ? "Converting..." : "Submitting...")
+                                            : isOwner
+                                              ? (application.riderConversionRequestedAt
+                                                  ? "Approve & Convert to Rider"
+                                                  : "Convert to Rider")
+                                              : "Request Rider Conversion"}
+                                    </button>
+                                )
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => onCreateEmployeeInvitation(application._id)}
+                                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-gray-800"
+                                >
+                                    <UserPlus size={14} />
+                                    Create Employee Invitation
+                                </button>
+                            )
                         ) : (
                             <StatusSelect
                                 application={
@@ -1828,6 +1934,9 @@ interface MobileApplicationCardProps {
         applicationId: string,
     ) => void;
 
+    onConvertToRider: (applicationId: string) => Promise<void>;
+    isOwner: boolean;
+
     isExpanded: boolean;
 
     isUpdating: boolean;
@@ -1850,11 +1959,18 @@ function MobileApplicationCard({
     onToggle,
     onUpdateStatus,
     onCreateEmployeeInvitation,
+    onConvertToRider,
+    isOwner,
 }: MobileApplicationCardProps) {
     const vacancyTitle =
         getVacancyTitle(
             application,
         );
+
+    const isRiderVacancy =
+        application.vacancyId !== null &&
+        typeof application.vacancyId === "object" &&
+        application.vacancyId.vacancyType === "RIDER";
 
     return (
         <article className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -1927,19 +2043,38 @@ function MobileApplicationCard({
 
                 <div className="mt-4">
                     {application.status === "SELECTED" ? (
-                        <button
-                            type="button"
-                            onClick={() =>
-                                onCreateEmployeeInvitation(
-                                    application._id,
-                                )
-                            }
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                        >
-                            <UserPlus size={16} />
-
-                            Create Employee Invitation
-                        </button>
+                        isRiderVacancy ? (
+                            application.riderConversionRequestedAt && !isOwner ? (
+                                <span className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800">
+                                    Awaiting owner approval
+                                </span>
+                            ) : (
+                                <button
+                                    type="button"
+                                    disabled={isUpdating}
+                                    onClick={() => void onConvertToRider(application._id)}
+                                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800 disabled:opacity-50"
+                                >
+                                    <UserPlus size={16} />
+                                    {isUpdating
+                                            ? (isOwner ? "Converting..." : "Submitting...")
+                                            : isOwner
+                                              ? (application.riderConversionRequestedAt
+                                                  ? "Approve & Convert to Rider"
+                                                  : "Convert to Rider")
+                                              : "Request Rider Conversion"}
+                                </button>
+                            )
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => onCreateEmployeeInvitation(application._id)}
+                                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800"
+                            >
+                                <UserPlus size={16} />
+                                Create Employee Invitation
+                            </button>
+                        )
                     ) : (
                         <StatusSelect
                             application={

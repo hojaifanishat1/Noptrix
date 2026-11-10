@@ -26,7 +26,19 @@ const getActorId = (req: Request): string => {
     return getAuthenticatedAdminId(req);
   }
 
-  throw new ApiError(401, "Owner or administrator authentication required.");
+  throw ApiError.unauthorized(
+    "Owner or administrator authentication required.",
+  );
+};
+
+const getRefundId = (req: Request): string => {
+  const { refundId } = req.params;
+
+  if (typeof refundId !== "string") {
+    throw ApiError.badRequest("Invalid refund ID.");
+  }
+
+  return refundId;
 };
 
 export const listAdminRefundsController = asyncHandler(
@@ -56,7 +68,7 @@ export const getRefundAnalyticsController = asyncHandler(
 
 export const getAdminRefundDetailsController = asyncHandler(
   async (req: Request, res: Response) => {
-    const refund = await getAdminRefundDetails(req.params.refundId);
+    const refund = await getAdminRefundDetails(getRefundId(req));
 
     res.status(200).json({
       success: true,
@@ -69,7 +81,7 @@ export const getAdminRefundDetailsController = asyncHandler(
 export const processAdminRefundController = asyncHandler(
   async (req: Request, res: Response) => {
     const refund = await processRefund(
-      req.params.refundId,
+      getRefundId(req),
       getActorId(req),
       req.body,
     );
@@ -85,7 +97,7 @@ export const processAdminRefundController = asyncHandler(
 export const cancelAdminRefundController = asyncHandler(
   async (req: Request, res: Response) => {
     const refund = await cancelPendingRefund(
-      req.params.refundId,
+      getRefundId(req),
       getActorId(req),
       req.body?.internalNote,
     );
@@ -101,7 +113,7 @@ export const cancelAdminRefundController = asyncHandler(
 export const confirmManualRefundController = asyncHandler(
   async (req: Request, res: Response) => {
     const refund = await confirmManualRefund(
-      req.params.refundId,
+      getRefundId(req),
       getActorId(req),
       req.body,
     );

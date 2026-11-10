@@ -99,6 +99,14 @@ const permissions = [
 
   ["employee_invitations", "manage", "employee_invitations.manage"],
 
+  ["rider_invitations", "read", "rider_invitations.read"],
+
+  ["rider_invitations", "create", "rider_invitations.create"],
+
+  ["rider_invitations", "revoke", "rider_invitations.revoke"],
+
+  ["rider_invitations", "manage", "rider_invitations.manage"],
+
   /*
     |--------------------------------------------------------------------------
     | Job Vacancy Management

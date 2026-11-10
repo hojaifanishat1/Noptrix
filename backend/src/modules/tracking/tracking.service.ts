@@ -393,6 +393,23 @@ export const updateTrackingLocation = async (
 
   await tracking.save();
 
+  // Keep the assigned rider's independent GPS location in sync.
+  if (tracking.riderId) {
+    await Rider.updateOne(
+      {
+        _id: tracking.riderId,
+        status: "ACTIVE",
+      },
+      {
+        $set: {
+          currentLatitude: input.latitude,
+          currentLongitude: input.longitude,
+          lastLocationAt: tracking.lastLocationAt,
+        },
+      },
+    );
+  }
+
   await TrackingEvent.create({
     trackingId: tracking._id,
     orderId: tracking.orderId,

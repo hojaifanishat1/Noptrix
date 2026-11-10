@@ -998,8 +998,8 @@ export const ADMIN_NAVIGATION_SECTIONS: readonly AdminNavigationSection[] = [
   },
 
   {
-    id: "delivery-shipping",
-    label: "Delivery & Shipping",
+    id: "delivery-management",
+    label: "Delivery Management",
     icon: Truck,
     items: [
       {
@@ -1019,30 +1019,44 @@ export const ADMIN_NAVIGATION_SECTIONS: readonly AdminNavigationSection[] = [
       {
         id: "delivery-zones",
         label: "Delivery Zones",
-        href: "/admin/delivery-zones",
+        href: "/admin/delivery/zones",
         icon: Globe,
         permission: "delivery_zones.read",
       },
       {
         id: "delivery-fees",
         label: "Delivery Fees",
-        href: "/admin/delivery-fees",
+        href: "/admin/delivery/fees",
         icon: CircleDollarSign,
         permission: "delivery_fees.read",
       },
       {
-        id: "shipping",
-        label: "Shipping",
-        href: "/admin/shipping",
-        icon: Truck,
-        permission: "shipping.read",
+        id: "delivery-areas",
+        label: "Delivery Areas",
+        href: "/admin/delivery/areas",
+        icon: Globe,
+        permission: "delivery_areas.read",
       },
       {
-        id: "shipping-providers",
-        label: "Shipping Providers",
-        href: "/admin/shipping/providers",
-        icon: Store,
-        permission: "shipping.read",
+        id: "delivery-methods",
+        label: "Delivery Methods",
+        href: "/admin/delivery/methods",
+        icon: Truck,
+        permission: "delivery_methods.read",
+      },
+      {
+        id: "delivery-fee-overrides",
+        label: "Area Fee Overrides",
+        href: "/admin/delivery/fee-overrides",
+        icon: CircleDollarSign,
+        permission: "area_fee_overrides.read",
+      },
+      {
+        id: "delivery-eligibility",
+        label: "Delivery Eligibility",
+        href: "/admin/delivery/eligibility",
+        icon: ClipboardCheck,
+        permission: "delivery_areas.read",
       },
       {
         id: "delivery-tracking",
@@ -1057,6 +1071,35 @@ export const ADMIN_NAVIGATION_SECTIONS: readonly AdminNavigationSection[] = [
         href: "/admin/reports/delivery",
         icon: FileBarChart,
         permission: "delivery_reports.read",
+      },
+    ],
+  },
+
+  {
+    id: "shipping-management",
+    label: "Shipping Management",
+    icon: Truck,
+    items: [
+      {
+        id: "shipping",
+        label: "Shipping",
+        href: "/admin/shipping",
+        icon: Truck,
+        permission: "shipping.read",
+      },
+      {
+        id: "shipping-assignment",
+        label: "Shipping Assignments",
+        href: "/admin/shipping/assignments",
+        icon: ClipboardList,
+        permission: "shipping.read",
+      },
+      {
+        id: "shipping-providers",
+        label: "Shipping Providers",
+        href: "/admin/shipping/providers",
+        icon: Store,
+        permission: "shipping.read",
       },
     ],
   },
@@ -1143,6 +1186,13 @@ export const ADMIN_NAVIGATION_SECTIONS: readonly AdminNavigationSection[] = [
         href: "/admin/employee-invitations",
         icon: UserPlus,
         permission: "employee_invitations.read",
+      },
+      {
+        id: "hr-rider-invitations",
+        label: "Rider Invitations",
+        href: "/admin/rider-invitations",
+        icon: UserPlus,
+        permission: "rider_invitations.read",
       },
       {
         id: "employee-activity",

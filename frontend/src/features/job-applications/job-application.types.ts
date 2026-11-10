@@ -25,6 +25,8 @@ export interface JobApplicationVacancy {
     jobTitle?: string;
 
     status?: string;
+
+    vacancyType?: "GENERAL" | "RIDER";
 }
 
 
@@ -88,6 +90,14 @@ export interface JobApplication {
 
     notes?: string;
 
+    riderConversionRequestedAt?: string;
+
+    riderConversionRequestedBy?: string;
+
+    convertedToRiderAt?: string;
+
+    riderId?: string;
+
     createdAt?: string;
 
     updatedAt?: string;
@@ -132,6 +142,8 @@ export interface JobApplicationListParams {
     vacancyId?: string;
 
     applicantId?: string;
+
+    riderConversionRequested?: boolean;
 }
 
 

@@ -319,6 +319,35 @@ export const riderLogin = async (
     }
 };
 
+export const riderVerifyLogin = async (
+    input: LoginVerificationInput,
+): Promise<AuthUser> => {
+    const response = await riderAuthApi.verifyLogin(input);
+
+    tokenStorage.set(response.accessToken);
+
+    try {
+        const profile = await riderAuthApi.getMe();
+
+        return saveAuthenticatedUser({
+            ...profile,
+            id: response.userId,
+            accountType: "RIDER",
+            role: "RIDER",
+        });
+    } catch (error) {
+        tokenStorage.clear();
+        await riderAuthApi.logout(response.sessionId);
+        throw error;
+    }
+};
+
+export const riderResendLoginCode = async (
+    challengeId: string,
+) => {
+    return riderAuthApi.resendLoginCode(challengeId);
+};
+
 
 /*
 |--------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import {
   VACANCY_STATUSES,
   VACANCY_EMPLOYMENT_TYPES,
   VACANCY_SALARY_TYPES,
+  VACANCY_TYPES,
 } from "./vacancy.model";
 
 /*
@@ -102,6 +103,8 @@ export const createVacancySchema = z
           .max(100, "Skill cannot exceed 100 characters."),
       )
       .optional(),
+
+    vacancyType: z.enum(Object.values(VACANCY_TYPES) as [string, ...string[]]).default("GENERAL"),
 
     employmentType: z.enum(
       Object.values(VACANCY_EMPLOYMENT_TYPES) as [string, ...string[]],
@@ -265,6 +268,8 @@ export const updateVacancySchema = z
 
     skills: z.array(z.string().trim().min(1).max(100)).optional(),
 
+    vacancyType: z.enum(Object.values(VACANCY_TYPES) as [string, ...string[]]).optional(),
+
     employmentType: z
       .enum(Object.values(VACANCY_EMPLOYMENT_TYPES) as [string, ...string[]])
       .optional(),
@@ -366,6 +371,8 @@ export const updateVacancyStatusSchema = z.object({
 */
 
 export const vacancyQuerySchema = z.object({
+  vacancyType: z.enum(Object.values(VACANCY_TYPES) as [string, ...string[]]).optional(),
+
   status: z
     .enum(Object.values(VACANCY_STATUSES) as [string, ...string[]])
     .optional(),

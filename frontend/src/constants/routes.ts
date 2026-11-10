@@ -83,6 +83,7 @@ export const ROUTES = {
     ADMIN_SELLER_ORDERS: "/admin/seller-orders",
 
     ADMIN_RIDERS: "/admin/riders",
+    ADMIN_RIDER_INVITATIONS: "/admin/rider-invitations",
 
     ADMIN_INVITATIONS: "/admin/invitations",
 
@@ -100,10 +101,18 @@ export const ROUTES = {
     ADMIN_RECEIPTS: "/admin/receipts",
     ADMIN_ACCOUNTING: "/admin/accounting",
 
-    ADMIN_SHIPPING: "/admin/shipping",
     ADMIN_DELIVERY: "/admin/delivery",
-    ADMIN_DELIVERY_FEES: "/admin/delivery-fees",
-    ADMIN_DELIVERY_ZONES: "/admin/delivery-zones",
+    ADMIN_DELIVERY_ASSIGNMENTS: "/admin/delivery/assignments",
+    ADMIN_DELIVERY_ZONES: "/admin/delivery/zones",
+    ADMIN_DELIVERY_FEES: "/admin/delivery/fees",
+    ADMIN_DELIVERY_AREAS: "/admin/delivery/areas",
+    ADMIN_DELIVERY_METHODS: "/admin/delivery/methods",
+    ADMIN_DELIVERY_FEE_OVERRIDES: "/admin/delivery/fee-overrides",
+    ADMIN_DELIVERY_ELIGIBILITY: "/admin/delivery/eligibility",
+
+    ADMIN_SHIPPING: "/admin/shipping",
+    ADMIN_SHIPPING_ASSIGNMENTS: "/admin/shipping/assignments",
+    ADMIN_SHIPPING_PROVIDERS: "/admin/shipping/providers",
 
     ADMIN_COUPONS: "/admin/coupons",
     ADMIN_DISCOUNTS: "/admin/discounts",

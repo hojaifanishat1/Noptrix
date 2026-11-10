@@ -17,6 +17,9 @@ import {
   updateRiderStatusController,
   deleteRiderController,
   getMyRiderController,
+  updateMyRiderLocationController,
+  updateMyRiderAvailabilityController,
+  convertSelectedApplicationToRiderController,
 } from "./rider.controller";
 
 import {
@@ -25,6 +28,10 @@ import {
   updateRiderStatusSchema,
   riderIdParamSchema,
   riderQuerySchema,
+  updateRiderLocationSchema,
+  updateRiderAvailabilitySchema,
+  riderApplicationIdParamSchema,
+  convertSelectedApplicationToRiderSchema,
 } from "./rider.validator";
 
 const router = Router();
@@ -36,6 +43,20 @@ const router = Router();
 */
 
 router.get("/me", riderAuth, getMyRiderController);
+
+router.patch(
+  "/me/location",
+  riderAuth,
+  validate(updateRiderLocationSchema, "body"),
+  updateMyRiderLocationController,
+);
+
+router.patch(
+  "/me/availability",
+  riderAuth,
+  validate(updateRiderAvailabilitySchema, "body"),
+  updateMyRiderAvailabilityController,
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -57,6 +78,14 @@ router.get(
   ...ownerOnly,
   validate(riderQuerySchema, "query"),
   getAllRidersController,
+);
+
+router.post(
+  "/applications/:applicationId/convert",
+  ...ownerOnly,
+  validate(riderApplicationIdParamSchema, "params"),
+  validate(convertSelectedApplicationToRiderSchema, "body"),
+  convertSelectedApplicationToRiderController,
 );
 
 router.get(

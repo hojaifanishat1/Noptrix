@@ -166,3 +166,61 @@ export type UpdateRiderStatusInput = z.infer<typeof updateRiderStatusSchema>;
 export type RiderIdParam = z.infer<typeof riderIdParamSchema>;
 
 export type RiderQueryInput = z.infer<typeof riderQuerySchema>;
+
+
+export const updateRiderLocationSchema = z.object({
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
+}).strict();
+
+export const updateRiderAvailabilitySchema = z.object({
+  isAvailable: z.boolean(),
+}).strict();
+
+export type UpdateRiderLocationInput = z.infer<
+  typeof updateRiderLocationSchema
+>;
+
+export type UpdateRiderAvailabilityInput = z.infer<
+  typeof updateRiderAvailabilitySchema
+>;
+
+
+/*
+|--------------------------------------------------------------------------
+| HR Selected Application -> Rider Conversion
+|--------------------------------------------------------------------------
+*/
+
+export const riderApplicationIdParamSchema = z.object({
+  applicationId: objectIdSchema,
+});
+
+export const convertSelectedApplicationToRiderSchema = z.object({
+  riderCode: z
+    .string()
+    .trim()
+    .min(3)
+    .max(50)
+    .regex(/^[A-Za-z0-9_-]+$/, "Invalid rider code."),
+
+  type: z.enum(riderTypes).default("INTERNAL"),
+
+  phone: z.string().trim().max(30).optional(),
+
+  vehicleType: z.enum(riderVehicleTypes).optional(),
+
+  vehicleNumber: z.string().trim().max(50).optional(),
+
+  licenseNumber: z.string().trim().max(100).optional(),
+
+  nationalId: z.string().trim().max(100).optional(),
+
+  joinedAt: z.coerce.date().optional(),
+
+  notes: z.string().trim().max(5000).optional(),
+});
+
+export type ConvertSelectedApplicationToRiderInput = z.infer<
+  typeof convertSelectedApplicationToRiderSchema
+>;

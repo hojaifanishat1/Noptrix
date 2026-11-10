@@ -15,6 +15,8 @@ import {
   UpdateRiderInput,
   UpdateRiderStatusInput,
   RiderQueryInput,
+  UpdateRiderLocationInput,
+  UpdateRiderAvailabilityInput,
 } from "./rider.validator";
 
 import {
@@ -25,8 +27,12 @@ import {
   updateRider,
   updateRiderStatus,
   deleteRider,
+  updateMyRiderLocation,
+  updateMyRiderAvailability,
 } from "./rider.service";
 
+import { ConvertSelectedApplicationToRiderInput } from "./rider.validator";
+import { convertSelectedApplicationToRider } from "./rider-recruitment.service";
 /*
 |--------------------------------------------------------------------------
 | OWNER
@@ -172,9 +178,9 @@ export const deleteRiderController = asyncHandler(
  */
 export const getMyRiderController = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const riderUserId = getAuthenticatedRiderId(req);
+    const riderId = getAuthenticatedRiderId(req);
 
-    const rider = await getRiderByUserId(riderUserId);
+    const rider = await getRiderById(riderId);
 
     res
       .status(200)
@@ -184,5 +190,84 @@ export const getMyRiderController = asyncHandler(
           "Rider profile retrieved successfully.",
         ).serialize(),
       );
+  },
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| Rider GPS and Availability Controllers
+|--------------------------------------------------------------------------
+*/
+
+export const updateMyRiderLocationController = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = getAuthenticatedRiderId(req);
+    const input = req.body as UpdateRiderLocationInput;
+
+    const rider = await updateMyRiderLocation(
+      userId,
+      input.latitude,
+      input.longitude,
+    );
+
+    res.status(200).json(
+      ApiResponse.ok(
+        rider,
+        "Rider location updated successfully.",
+      ).serialize(),
+    );
+  },
+);
+
+export const updateMyRiderAvailabilityController = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = getAuthenticatedRiderId(req);
+    const input = req.body as UpdateRiderAvailabilityInput;
+
+    const rider = await updateMyRiderAvailability(
+      userId,
+      input.isAvailable,
+    );
+
+    res.status(200).json(
+      ApiResponse.ok(
+        rider,
+        "Rider availability updated successfully.",
+      ).serialize(),
+    );
+  },
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| OWNER: Convert selected HR applicant into Rider
+|--------------------------------------------------------------------------
+*/
+
+export const convertSelectedApplicationToRiderController = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const ownerId = getAuthenticatedOwnerId(req);
+    const applicationId = req.params.applicationId;
+
+    if (typeof applicationId !== "string") {
+      throw ApiError.badRequest("Invalid job application ID.");
+    }
+
+    const input = req.body as ConvertSelectedApplicationToRiderInput;
+
+    const rider = await convertSelectedApplicationToRider(
+      applicationId,
+      ownerId,
+      input,
+    );
+
+    res.status(201).json(
+      ApiResponse.created(
+        rider,
+        "Selected applicant converted to rider successfully.",
+      ).serialize(),
+    );
   },
 );

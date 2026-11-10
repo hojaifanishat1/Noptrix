@@ -6,6 +6,20 @@ import { Document, Model, Schema, Types, model } from "mongoose";
 |--------------------------------------------------------------------------
 */
 
+export const VACANCY_TYPES = {
+  GENERAL: "GENERAL",
+  RIDER: "RIDER",
+} as const;
+
+export type VacancyType =
+  (typeof VACANCY_TYPES)[keyof typeof VACANCY_TYPES];
+
+/*
+|--------------------------------------------------------------------------
+| Vacancy Status
+|--------------------------------------------------------------------------
+*/
+
 export const VACANCY_STATUSES = {
   DRAFT: "DRAFT",
   OPEN: "OPEN",
@@ -77,6 +91,7 @@ export interface IVacancy {
 
   skills?: string[];
 
+  vacancyType: VacancyType;
   employmentType: VacancyEmploymentType;
 
   location?: string;
@@ -241,6 +256,13 @@ const vacancySchema = new Schema<IVacancyDocument>(
             |--------------------------------------------------------------------------
             */
 
+    vacancyType: {
+      type: String,
+      enum: Object.values(VACANCY_TYPES),
+      default: VACANCY_TYPES.GENERAL,
+      index: true,
+    },
+
     employmentType: {
       type: String,
       enum: {
@@ -374,6 +396,8 @@ const vacancySchema = new Schema<IVacancyDocument>(
 | Indexes
 |--------------------------------------------------------------------------
 */
+
+vacancySchema.index({ vacancyType: 1, status: 1 });
 
 vacancySchema.index(
   {

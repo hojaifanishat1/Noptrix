@@ -264,6 +264,7 @@ export class DeliveryService {
     page: number;
     limit: number;
     status?: DeliveryStatus;
+    search?: string;
     orderId?: string;
     riderId?: string;
     customerId?: string;
@@ -275,6 +276,18 @@ export class DeliveryService {
     if (query.orderId) filter.orderId = query.orderId;
     if (query.riderId) filter.riderId = query.riderId;
     if (query.customerId) filter.customerId = query.customerId;
+    if (query.search) {
+      const escaped = query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      filter.$or = [
+        { deliveryNumber: { $regex: escaped, $options: "i" } },
+        { recipientName: { $regex: escaped, $options: "i" } },
+        { recipientPhone: { $regex: escaped, $options: "i" } },
+        { city: { $regex: escaped, $options: "i" } },
+        ...(Types.ObjectId.isValid(query.search)
+          ? [{ orderId: new Types.ObjectId(query.search) }]
+          : []),
+      ];
+    }
 
     const [items, total] = await Promise.all([
       Delivery.find(filter)

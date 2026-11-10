@@ -17,6 +17,7 @@ import {
 
 export interface IRider extends Document {
   userId: Types.ObjectId;
+  jobApplicationId?: Types.ObjectId;
 
   riderCode: string;
 
@@ -37,6 +38,11 @@ export interface IRider extends Document {
   nationalId?: string;
 
   status: RiderStatus;
+  isAvailable: boolean;
+  currentLatitude?: number;
+  currentLongitude?: number;
+  lastLocationAt?: Date;
+  maxActiveDeliveries: number;
 
   joinedAt?: Date;
 
@@ -77,6 +83,11 @@ const riderSchema = new Schema<IRider>(
       required: true,
       unique: true,
       index: true,
+    },
+
+    jobApplicationId: {
+      type: Schema.Types.ObjectId,
+      ref: "JobApplication",
     },
 
     riderCode: {
@@ -144,7 +155,41 @@ const riderSchema = new Schema<IRider>(
       maxlength: 100,
     },
 
-    status: {
+    isAvailable: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+
+  currentLatitude: {
+    type: Number,
+    min: -90,
+    max: 90,
+  },
+
+  currentLongitude: {
+    type: Number,
+    min: -180,
+    max: 180,
+  },
+
+  lastLocationAt: {
+    type: Date,
+    index: true,
+  },
+
+  maxActiveDeliveries: {
+    type: Number,
+    default: 1,
+    min: 1,
+    max: 20,
+    validate: {
+      validator: Number.isInteger,
+      message: "Maximum active deliveries must be an integer.",
+    },
+  },
+
+  status: {
       type: String,
       enum: RIDER_STATUSES,
       required: true,
@@ -244,4 +289,13 @@ riderSchema.index({
 |--------------------------------------------------------------------------
 */
 
+riderSchema.index({ jobApplicationId: 1 }, { unique: true, sparse: true });
+
 export const Rider: Model<IRider> = model<IRider>("Rider", riderSchema);
+
+
+riderSchema.index({
+  status: 1,
+  isAvailable: 1,
+  lastLocationAt: -1,
+});

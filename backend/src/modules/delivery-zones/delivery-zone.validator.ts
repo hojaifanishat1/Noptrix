@@ -1,3 +1,4 @@
+
 import { z } from "zod";
 
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -49,8 +50,24 @@ const zoneFields = {
   status: z.enum(["active", "inactive"]).default("active"),
 };
 
-const zoneObject = z.object(zoneFields).superRefine((value, context) => {
-  if (value.estimatedDeliveryMinDays > value.estimatedDeliveryMaxDays) {
+type ZoneRuleInput = {
+  estimatedDeliveryMinDays?: number;
+  estimatedDeliveryMaxDays?: number;
+  boundary?: {
+    type: "Polygon";
+    coordinates: number[][][];
+  };
+};
+
+const validateZoneRules = (
+  value: ZoneRuleInput,
+  context: z.RefinementCtx,
+) => {
+  if (
+    value.estimatedDeliveryMinDays !== undefined &&
+    value.estimatedDeliveryMaxDays !== undefined &&
+    value.estimatedDeliveryMinDays > value.estimatedDeliveryMaxDays
+  ) {
     context.addIssue({
       code: "custom",
       path: ["estimatedDeliveryMaxDays"],
@@ -63,7 +80,12 @@ const zoneObject = z.object(zoneFields).superRefine((value, context) => {
       const first = ring[0];
       const last = ring[ring.length - 1];
 
-      if (!first || !last || first[0] !== last[0] || first[1] !== last[1]) {
+      if (
+        !first ||
+        !last ||
+        first[0] !== last[0] ||
+        first[1] !== last[1]
+      ) {
         context.addIssue({
           code: "custom",
           path: ["boundary", "coordinates"],
@@ -88,7 +110,18 @@ const zoneObject = z.object(zoneFields).superRefine((value, context) => {
       }
     }
   }
-});
+};
+
+const zoneObject = z.object(zoneFields).superRefine(validateZoneRules);
+
+const zoneUpdateObject = z
+  .object(zoneFields)
+  .partial()
+  .superRefine(validateZoneRules)
+  .refine(
+    (value) => Object.keys(value).length > 0,
+    "At least one field is required",
+  );
 
 export const createDeliveryZoneSchema = z.object({
   body: zoneObject,
@@ -98,12 +131,7 @@ export const updateDeliveryZoneSchema = z.object({
   params: z.object({
     id: z.string().regex(/^[a-f\d]{24}$/i),
   }),
-  body: zoneObject
-    .partial()
-    .refine(
-      (value) => Object.keys(value).length > 0,
-      "At least one field is required",
-    ),
+  body: zoneUpdateObject,
 });
 
 export const deliveryZoneIdSchema = z.object({

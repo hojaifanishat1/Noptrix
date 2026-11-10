@@ -36,6 +36,8 @@ export type JobSalaryType =
 export interface JobVacancy {
     id: string;
 
+    vacancyType?: "GENERAL" | "RIDER";
+
     title: string;
 
     slug: string;
@@ -118,6 +120,8 @@ export const normalizeJobVacancy = (
 
 
 export interface CreateJobVacancyInput {
+    vacancyType: "GENERAL" | "RIDER";
+
     title: string;
 
     slug: string;
@@ -157,6 +161,8 @@ export interface CreateJobVacancyInput {
 
 
 export interface UpdateJobVacancyInput {
+    vacancyType?: "GENERAL" | "RIDER";
+
     title?: string;
 
     slug?: string;

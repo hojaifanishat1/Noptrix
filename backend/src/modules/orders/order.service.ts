@@ -339,6 +339,7 @@ export const createOrderFromCheckout = async (
             ...(checkout.shippingMethod
               ? { shippingMethod: checkout.shippingMethod }
               : {}),
+            ...(checkout.delivery ? { delivery: checkout.delivery } : {}),
             paymentMethod: checkout.paymentMethod,
             paymentStatus:
               checkout.paymentStatus === "PAID"

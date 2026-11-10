@@ -192,6 +192,44 @@ const checkoutTotalsSchema = new Schema(
   },
 );
 
+
+const checkoutDeliverySchema = new Schema(
+  {
+    zoneId: {
+      type: Schema.Types.ObjectId,
+      ref: "DeliveryZone",
+      required: true,
+    },
+    zoneName: { type: String, required: true, trim: true },
+    areaId: {
+      type: Schema.Types.ObjectId,
+      ref: "DeliveryArea",
+      required: true,
+    },
+    areaName: { type: String, required: true, trim: true },
+    methodId: {
+      type: Schema.Types.ObjectId,
+      ref: "DeliveryMethod",
+    },
+    methodCode: { type: String, trim: true },
+    methodName: { type: String, trim: true },
+    fee: { type: Number, required: true, min: 0 },
+    currency: {
+      type: String,
+      required: true,
+      uppercase: true,
+      minlength: 3,
+      maxlength: 3,
+    },
+    freeDeliveryApplied: { type: Boolean, required: true, default: false },
+    estimatedMinMinutes: { type: Number, min: 0 },
+    estimatedMaxMinutes: { type: Number, min: 0 },
+    distanceKm: { type: Number, min: 0 },
+    estimatedTravelMinutes: { type: Number, min: 0 },
+  },
+  { _id: false, strict: "throw" },
+);
+
 const checkoutSchema = new Schema<Checkout>(
   {
     userId: {
@@ -249,6 +287,7 @@ const checkoutSchema = new Schema<Checkout>(
       trim: true,
       maxlength: 100,
     },
+    delivery: { type: checkoutDeliverySchema },
     paymentMethod: {
       type: String,
       required: true,

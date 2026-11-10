@@ -424,6 +424,10 @@ export const updateRiderStatus = async (
 
   rider.updatedBy = actorObjectId;
 
+  if (input.status !== "ACTIVE") {
+    rider.isAvailable = false;
+  }
+
   if (input.status === "SUSPENDED") {
     if (!input.reason?.trim()) {
       throw ApiError.badRequest("Suspension reason is required.");
@@ -539,4 +543,84 @@ export const deleteRider = async (riderId: string): Promise<void> => {
   await Rider.deleteOne({
     _id: riderObjectId,
   });
+};
+
+
+/*
+|--------------------------------------------------------------------------
+| Rider GPS Location
+|--------------------------------------------------------------------------
+*/
+
+export const updateMyRiderLocation = async (
+  riderId: string,
+  latitude: number,
+  longitude: number,
+): Promise<IRider> => {
+  const riderObjectId = validateObjectId(riderId, "riderId");
+
+  const rider = await Rider.findById(riderObjectId);
+
+  if (!rider) {
+    throw ApiError.notFound("Rider profile not found.");
+  }
+
+  if (rider.status !== "ACTIVE") {
+    throw ApiError.badRequest(
+      "Only active riders can update their location.",
+    );
+  }
+
+  rider.currentLatitude = latitude;
+  rider.currentLongitude = longitude;
+  rider.lastLocationAt = new Date();
+
+  await rider.save();
+  return rider;
+};
+
+/*
+|--------------------------------------------------------------------------
+| Rider Availability
+|--------------------------------------------------------------------------
+*/
+
+export const updateMyRiderAvailability = async (
+  riderId: string,
+  isAvailable: boolean,
+): Promise<IRider> => {
+  const riderObjectId = validateObjectId(riderId, "riderId");
+
+  const rider = await Rider.findById(riderObjectId);
+
+  if (!rider) {
+    throw ApiError.notFound("Rider profile not found.");
+  }
+
+  if (rider.status !== "ACTIVE" && isAvailable) {
+    throw ApiError.badRequest(
+      "Only active riders can become available.",
+    );
+  }
+
+  if (isAvailable) {
+    const hasCoordinates =
+      rider.currentLatitude != null &&
+      rider.currentLongitude != null;
+
+    const locationIsFresh =
+      rider.lastLocationAt != null &&
+      Date.now() - rider.lastLocationAt.getTime() <= 5 * 60 * 1000;
+
+    if (!hasCoordinates || !locationIsFresh) {
+      throw ApiError.badRequest(
+        "Update your current GPS location before becoming available.",
+      );
+    }
+  }
+
+  rider.isAvailable = isAvailable;
+  await rider.save();
+
+  return rider;
 };

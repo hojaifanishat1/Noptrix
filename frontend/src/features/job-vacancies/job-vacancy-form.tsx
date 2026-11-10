@@ -41,6 +41,7 @@ const DESCRIPTION_MAX_LENGTH = 10000;
 const MAX_LIST_ITEMS = 30;
 
 const initialForm: CreateJobVacancyInput = {
+    vacancyType: "GENERAL",
     title: "",
     slug: "",
     department: "",
@@ -124,6 +125,7 @@ const getInitialForm = (
 
     return {
         title: vacancy.title ?? "",
+        vacancyType: vacancy.vacancyType ?? "GENERAL",
         slug: vacancy.slug ?? "",
         department: vacancy.department ?? "",
         jobTitle: vacancy.jobTitle ?? "",
@@ -1071,6 +1073,21 @@ export default function JobVacancyForm({
                             />
 
                             <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
+                                <Field label="Vacancy type" required>
+                                    <Select
+                                        value={form.vacancyType}
+                                        onChange={(event) =>
+                                            updateField(
+                                                "vacancyType",
+                                                event.target.value as CreateJobVacancyInput["vacancyType"],
+                                            )
+                                        }
+                                    >
+                                        <option value="GENERAL">General</option>
+                                        <option value="RIDER">Rider</option>
+                                    </Select>
+                                </Field>
+
                                 <Field
                                     label="Employment type"
                                     required

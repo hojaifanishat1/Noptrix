@@ -50,6 +50,10 @@ export class DeliveryFeeService {
       data.deliveryZoneId = new Types.ObjectId(input.deliveryZoneId);
     }
 
+    if (input.deliveryMethodId) {
+      data.deliveryMethodId = new Types.ObjectId(input.deliveryMethodId);
+    }
+
     if (actorId && Types.ObjectId.isValid(actorId)) {
       data.createdBy = new Types.ObjectId(actorId);
       data.updatedBy = new Types.ObjectId(actorId);
@@ -136,6 +140,12 @@ export class DeliveryFeeService {
       changes.deliveryZoneId = new Types.ObjectId(input.deliveryZoneId);
     }
 
+    if (input.deliveryMethodId) {
+      changes.deliveryMethodId = new Types.ObjectId(input.deliveryMethodId);
+    } else if (input.deliveryMethodId === undefined) {
+      // Keep an existing method assignment unless explicitly changed.
+    }
+
     if (actorId && Types.ObjectId.isValid(actorId)) {
       changes.updatedBy = new Types.ObjectId(actorId);
     }
@@ -203,6 +213,10 @@ export class DeliveryFeeService {
       filter.deliveryZoneId = new Types.ObjectId(query.deliveryZoneId);
     }
 
+    if (query.deliveryMethodId) {
+      filter.deliveryMethodId = new Types.ObjectId(query.deliveryMethodId);
+    }
+
     if (query.search) {
       const regex = new RegExp(escapeRegex(query.search), "i");
       filter.$or = [{ name: regex }, { slug: regex }];
@@ -237,13 +251,15 @@ export class DeliveryFeeService {
     };
   }
 
+
   static async calculate(input: CalculateDeliveryFeeInput) {
     const country = normalizeCountry(input.country);
     const city = normalizeCity(input.city);
+    const weightKg = input.weightKg;
 
-    const baseFilter = {
+    const baseFilter: Record<string, unknown> = {
       country,
-      status: "active" as const,
+      status: "active",
       $or: [
         { city: { $exists: false } },
         { city: "" },
@@ -255,12 +271,9 @@ export class DeliveryFeeService {
       .sort({ priority: -1, createdAt: -1 })
       .lean();
 
-    const rules = allRules.filter((rule) => {
+    const matchingRules = allRules.filter((rule) => {
       if (input.state) {
-        if (
-          rule.state &&
-          normalizeCity(rule.state) !== normalizeCity(input.state)
-        ) {
+        if (rule.state && normalizeCity(rule.state) !== normalizeCity(input.state)) {
           return false;
         }
       } else if (rule.state) {
@@ -271,49 +284,82 @@ export class DeliveryFeeService {
         if (
           rule.deliveryZoneId &&
           rule.deliveryZoneId.toString() !== input.deliveryZoneId
-        ) {
-          return false;
-        }
-      }
-
-      if (input.postalCode && rule.postalCodes.length > 0) {
-        if (!rule.postalCodes.includes(input.postalCode)) return false;
-      } else if (!input.postalCode && rule.postalCodes.length > 0) {
+        ) return false;
+      } else if (rule.deliveryZoneId) {
         return false;
       }
 
-      if (rule.deliveryZoneId && !input.deliveryZoneId) return false;
-
-      if (input.paymentMethod === "cod" && !rule.supportsCOD) {
+      if (input.postalCode) {
+        if (
+          rule.postalCodes.length &&
+          !rule.postalCodes.includes(input.postalCode.trim())
+        ) return false;
+      } else if (rule.postalCodes.length) {
         return false;
       }
 
+      if (input.paymentMethod === "cod" && !rule.supportsCOD) return false;
       if (input.orderAmount < rule.minimumOrderAmount) return false;
 
-      if (input.weightKg < rule.minimumWeightKg) return false;
+      if (rule.deliveryMethodId) {
+        if (
+          !input.deliveryMethodId ||
+          rule.deliveryMethodId.toString() !== input.deliveryMethodId
+        ) return false;
+      }
 
       if (
-        rule.maximumWeightKg !== undefined &&
-        input.weightKg > rule.maximumWeightKg
-      ) {
-        return false;
+        rule.method === "weight_based" &&
+        (weightKg === undefined || !Number.isFinite(weightKg))
+      ) return false;
+
+      if (weightKg !== undefined) {
+        if (weightKg < rule.minimumWeightKg) return false;
+        if (
+          rule.maximumWeightKg !== undefined &&
+          weightKg > rule.maximumWeightKg
+        ) return false;
       }
 
       return true;
     });
 
-    // More specific rules win. Priority breaks ties.
+    // Exact selected method first. Methodless legacy rules are fallback.
+    const methodRules = input.deliveryMethodId
+      ? matchingRules.filter(
+          (rule) =>
+            rule.deliveryMethodId?.toString() === input.deliveryMethodId,
+        )
+      : matchingRules.filter((rule) => !rule.deliveryMethodId);
+
+    const legacyRules = input.deliveryMethodId
+      ? matchingRules.filter((rule) => !rule.deliveryMethodId)
+      : [];
+
+    const rules = [...methodRules, ...legacyRules];
+
     rules.sort((a, b) => {
       const specificity = (rule: (typeof rules)[number]) =>
         (rule.deliveryZoneId ? 8 : 0) +
-        (rule.postalCodes.length > 0 ? 4 : 0) +
+        (rule.postalCodes.length ? 4 : 0) +
         (rule.city ? 2 : 0) +
         (rule.state ? 1 : 0);
 
       return specificity(b) - specificity(a) || b.priority - a.priority;
     });
 
-    const rule = rules[0];
+    // Keep exact method rules ahead of legacy fallback rules.
+    const rule =
+      methodRules.length > 0
+        ? [...methodRules].sort((a, b) => {
+            const score = (r: (typeof rules)[number]) =>
+              (r.deliveryZoneId ? 8 : 0) +
+              (r.postalCodes.length ? 4 : 0) +
+              (r.city ? 2 : 0) +
+              (r.state ? 1 : 0);
+            return score(b) - score(a) || b.priority - a.priority;
+          })[0]
+        : legacyRules.sort((a, b) => b.priority - a.priority)[0];
 
     if (!rule) {
       return {
@@ -343,12 +389,16 @@ export class DeliveryFeeService {
     let fee = rule.baseFee;
 
     if (rule.method === "weight_based") {
-      fee += input.weightKg * rule.perKgFee;
-    }
-
-    if (rule.method === "order_value_based") {
-      // baseFee represents the configured fee for this order-value rule.
-      fee = rule.baseFee;
+      if (weightKg === undefined || !Number.isFinite(weightKg)) {
+        return {
+          available: false,
+          fee: 0,
+          currency: "BDT" as const,
+          freeDelivery: false,
+          message: "Product shipping weight is required for this delivery fee.",
+        };
+      }
+      fee += weightKg * rule.perKgFee;
     }
 
     fee = Math.round((fee + Number.EPSILON) * 100) / 100;
@@ -363,4 +413,5 @@ export class DeliveryFeeService {
       message: "Delivery fee calculated successfully.",
     };
   }
+
 }

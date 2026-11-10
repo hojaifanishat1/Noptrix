@@ -140,6 +140,8 @@ export const loginRider = async (
 
   const rider = await getRiderByUserId(userId);
 
+  console.info("[RIDER LOGIN] Rider status:", rider.status);
+
   if (!rider) {
     throw ApiError.forbidden("This account is not registered as a rider.", {
       code: "RIDER_PROFILE_NOT_FOUND",

@@ -71,6 +71,23 @@ export interface OrderItem {
   currency: string;
 }
 
+export interface OrderDeliverySnapshot {
+  zoneId: Types.ObjectId;
+  zoneName: string;
+  areaId: Types.ObjectId;
+  areaName: string;
+  methodId?: Types.ObjectId;
+  methodCode?: string;
+  methodName?: string;
+  fee: number;
+  currency: string;
+  freeDeliveryApplied: boolean;
+  estimatedMinMinutes?: number;
+  estimatedMaxMinutes?: number;
+  distanceKm?: number;
+  estimatedTravelMinutes?: number;
+}
+
 export interface OrderTotals {
   currency: string;
   itemCount: number;
@@ -91,6 +108,7 @@ export interface Order {
   shippingAddress: OrderAddressSnapshot;
   billingAddress?: OrderAddressSnapshot;
   shippingMethod?: string;
+  delivery?: OrderDeliverySnapshot;
   paymentMethod: string;
   paymentStatus: OrderPaymentStatus;
   fulfillmentStatus: OrderFulfillmentStatus;

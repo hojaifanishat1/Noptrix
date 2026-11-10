@@ -191,6 +191,15 @@ export const jobApplicationQuerySchema = z
 
     applicantId: objectIdSchema.optional(),
 
+    riderConversionRequested: z
+      .preprocess(
+        (value) =>
+          value === undefined
+            ? undefined
+            : value === true || value === "true",
+        z.boolean().optional(),
+      ),
+
     search: z
       .string()
       .trim()

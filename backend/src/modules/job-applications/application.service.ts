@@ -175,7 +175,7 @@ export const getJobApplicationById = async (applicationId: string) => {
   const applicationObjectId = validateObjectId(applicationId, "applicationId");
 
   const application = await JobApplication.findById(applicationObjectId)
-    .populate("vacancyId", "title slug department jobTitle status")
+    .populate("vacancyId", "title slug department jobTitle status vacancyType")
     .populate("applicantId", "name email phone")
     .populate("reviewedBy", "name email");
 
@@ -239,7 +239,7 @@ export const getMyJobApplications = async (
 
   const [applications, total] = await Promise.all([
     JobApplication.find(filter)
-      .populate("vacancyId", "title slug department jobTitle status")
+      .populate("vacancyId", "title slug department jobTitle status vacancyType")
       .sort({
         createdAt: -1,
       })
@@ -288,6 +288,15 @@ export const getAllJobApplications = async (
     filter.applicantId = validateObjectId(query.applicantId, "applicantId");
   }
 
+  if (query.riderConversionRequested !== undefined) {
+    filter.riderConversionRequestedAt = {
+      $exists: query.riderConversionRequested,
+    };
+  }
+  if (query.riderConversionRequested) {
+    filter.convertedToRiderAt = { $exists: false };
+  }
+
   if (query.search) {
     const search = escapeRegex(query.search.trim());
 
@@ -313,7 +322,7 @@ export const getAllJobApplications = async (
 
   const [applications, total] = await Promise.all([
     JobApplication.find(filter)
-      .populate("vacancyId", "title slug department jobTitle status")
+      .populate("vacancyId", "title slug department jobTitle status vacancyType")
       .populate("applicantId", "name email phone")
       .populate("reviewedBy", "name email")
       .sort({
@@ -838,6 +847,49 @@ export const updateJobApplicationStatus = async (
 | Withdraw
 |--------------------------------------------------------------------------
 */
+
+export const requestRiderConversion = async (
+  applicationId: string,
+  requestedBy: string,
+) => {
+  const applicationObjectId = validateObjectId(applicationId, "applicationId");
+  const requesterObjectId = validateObjectId(requestedBy, "requesterId");
+
+  const application = await JobApplication.findById(applicationObjectId);
+  if (!application) {
+    throw ApiError.notFound("Job application not found.");
+  }
+
+  if (application.status !== "SELECTED") {
+    throw ApiError.badRequest(
+      "Only SELECTED applicants can be submitted for rider conversion.",
+    );
+  }
+
+  const vacancy = await Vacancy.findById(application.vacancyId)
+    .select("vacancyType")
+    .lean()
+    .exec();
+  if (vacancy?.vacancyType !== "RIDER") {
+    throw ApiError.badRequest("Only RIDER vacancy applicants can be converted.");
+  }
+
+  if (application.riderId || application.convertedToRiderAt) {
+    throw ApiError.conflict("This application has already been converted.");
+  }
+
+  if (application.riderConversionRequestedAt) {
+    throw ApiError.conflict(
+      "This application is already awaiting owner approval.",
+    );
+  }
+
+  application.riderConversionRequestedAt = new Date();
+  application.riderConversionRequestedBy = requesterObjectId;
+  await application.save();
+
+  return application;
+};
 
 export const withdrawJobApplication = async (
   applicationId: string,

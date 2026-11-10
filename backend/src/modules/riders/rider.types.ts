@@ -74,6 +74,12 @@ export interface RiderData {
 
   status: RiderStatus;
 
+  isAvailable: boolean;
+  currentLatitude?: number;
+  currentLongitude?: number;
+  lastLocationAt?: Date;
+  maxActiveDeliveries: number;
+
   joinedAt?: Date;
 
   suspendedAt?: Date;

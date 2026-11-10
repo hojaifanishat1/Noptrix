@@ -24,6 +24,7 @@ import {
   withdrawJobApplication,
   getRecruitmentReports,
   getVacancyApplicationSummary,
+  requestRiderConversion,
 } from "./application.service";
 
 /*
@@ -264,6 +265,31 @@ export const updateJobApplicationStatusController = asyncHandler(
         ApiResponse.ok(
           application,
           "Job application status updated successfully.",
+        ).serialize(),
+      );
+  },
+);
+
+export const requestRiderConversionController = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const requesterId = await getManagementActorUserId(req);
+
+    const applicationId = getStringParam(
+      req.params.applicationId,
+      "application ID",
+    );
+
+    const application = await requestRiderConversion(
+      applicationId,
+      requesterId,
+    );
+
+    res
+      .status(200)
+      .json(
+        ApiResponse.ok(
+          application,
+          "Rider conversion request submitted for owner approval.",
         ).serialize(),
       );
   },

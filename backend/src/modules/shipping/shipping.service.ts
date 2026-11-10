@@ -265,6 +265,7 @@ export class ShippingService {
     page: number;
     limit: number;
     status?: ShippingStatus;
+    search?: string;
     orderId?: string;
     customerId?: string;
     riderId?: string;
@@ -278,6 +279,17 @@ export class ShippingService {
     if (query.customerId) filter.customerId = query.customerId;
     if (query.riderId) filter.riderId = query.riderId;
     if (query.provider) filter.provider = query.provider;
+    if (query.search) {
+      const escaped = query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      filter.$or = [
+        { shipmentNumber: { $regex: escaped, $options: "i" } },
+        { trackingNumber: { $regex: escaped, $options: "i" } },
+        { provider: { $regex: escaped, $options: "i" } },
+        ...(Types.ObjectId.isValid(query.search)
+          ? [{ orderId: new Types.ObjectId(query.search) }]
+          : []),
+      ];
+    }
 
     const skip = (query.page - 1) * query.limit;
     const sort = query.sort === "oldest" ? 1 : -1;

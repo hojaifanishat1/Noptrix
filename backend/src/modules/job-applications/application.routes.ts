@@ -21,6 +21,7 @@ import {
   updateJobApplicationStatusController,
   getVacancyApplicationSummaryController,
   getRecruitmentReportsController,
+  requestRiderConversionController,
 } from "./application.controller";
 
 import { requireJobApplicationStatusPermission } from "./application-authorization.middleware";
@@ -157,6 +158,17 @@ router.patch(
   validate(updateJobApplicationStatusSchema, "body"),
   requireJobApplicationStatusPermission,
   updateJobApplicationStatusController,
+);
+
+router.post(
+  "/:applicationId/rider-conversion-request",
+  ...managementAuth,
+  validate(jobApplicationIdParamSchema, "params"),
+  requirePermissionMatch(
+    "job_applications.approve",
+    "job_applications.manage",
+  ),
+  requestRiderConversionController,
 );
 
 /*

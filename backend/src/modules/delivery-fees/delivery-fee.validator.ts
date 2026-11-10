@@ -30,6 +30,11 @@ const commonFields = {
     .refine(Types.ObjectId.isValid, "Invalid delivery zone ID.")
     .optional(),
 
+  deliveryMethodId: z
+    .string()
+    .refine(Types.ObjectId.isValid, "Invalid delivery method ID.")
+    .optional(),
+
   postalCodes: postalCodesSchema,
 
   method: z.enum(["flat", "weight_based", "order_value_based"]).default("flat"),
@@ -82,6 +87,7 @@ export const updateDeliveryFeeSchema = z
     state: commonFields.state,
     city: commonFields.city,
     deliveryZoneId: commonFields.deliveryZoneId,
+    deliveryMethodId: commonFields.deliveryMethodId,
     postalCodes: z.array(z.string().trim().min(1).max(20)).max(200).optional(),
 
     method: commonFields.method.optional(),
@@ -144,6 +150,7 @@ export const listDeliveryFeesSchema = z.object({
     .string()
     .refine(Types.ObjectId.isValid, "Invalid delivery zone ID.")
     .optional(),
+  deliveryMethodId: commonFields.deliveryMethodId,
   sort: z.enum(["newest", "oldest", "priority", "name"]).default("priority"),
 });
 
@@ -158,6 +165,8 @@ export const calculateDeliveryFeeSchema = z
       .string()
       .refine(Types.ObjectId.isValid, "Invalid delivery zone ID.")
       .optional(),
+
+    deliveryMethodId: commonFields.deliveryMethodId,
 
     orderAmount: z.number().finite().min(0),
     weightKg: z.number().finite().min(0).default(0),

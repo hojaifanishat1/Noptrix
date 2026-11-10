@@ -122,6 +122,14 @@ export const jobApplicationsApi = {
         return response.data.data;
     },
 
+    async requestRiderConversion(applicationId: string): Promise<JobApplication> {
+        const response = await apiClient.post<ApiResponse<JobApplication>>(
+            `/job-applications/${applicationId}/rider-conversion-request`,
+        );
+
+        return response.data.data;
+    },
+
 
     async getVacancySummary(
         vacancyId: string,

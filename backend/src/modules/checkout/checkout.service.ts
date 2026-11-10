@@ -11,6 +11,7 @@ import { InventoryModel } from "../inventory/inventory.model";
 import { ProductModel } from "../products/product.model";
 import ProductVariantModel from "../product-variants/variant.model";
 import type { ProductVariantDocument } from "../product-variants/variant.model";
+import { DeliveryEligibilityService } from "../delivery-areas/delivery-eligibility.service";
 
 import CheckoutModel from "./checkout.model";
 import type {
@@ -52,6 +53,7 @@ const getOwnedAddress = async (
   let query = AddressModel.findOne({
     _id: toObjectId(addressId),
     userId,
+    isActive: true,
   });
 
   if (session) query = query.session(session);
@@ -261,8 +263,114 @@ export const createCheckout = async (
        * Never trust discount, shipping or tax amounts from the client.
        */
       const discountAmount = 0;
-      const shippingAmount = 0;
       const taxAmount = 0;
+
+      if (input.paymentMethod !== "cod" && input.paymentMethod !== "online") {
+        throw ApiError.badRequest("Unsupported payment method.");
+      }
+
+      const addressCountryCode = String(
+        shippingAddress.countryCode || "",
+      ).trim().toUpperCase();
+
+      const countryCode = /^[A-Z]{2,3}$/.test(addressCountryCode)
+        ? addressCountryCode
+        : (/^[A-Za-z]{2,3}$/.test(shippingAddress.country.trim())
+            ? shippingAddress.country.trim().toUpperCase()
+            : "");
+
+      if (!countryCode) {
+        throw ApiError.badRequest(
+          "A valid ISO country code is required for delivery.",
+        );
+      }
+
+      const latitude = shippingAddress.location?.latitude;
+      const longitude = shippingAddress.location?.longitude;
+
+      const eligibility = await DeliveryEligibilityService.check({
+        country: countryCode,
+        city: shippingAddress.city,
+        ...(shippingAddress.state ? { state: shippingAddress.state } : {}),
+        ...(shippingAddress.postalCode
+          ? { postalCode: shippingAddress.postalCode }
+          : {}),
+        ...(latitude != null ? { latitude } : {}),
+        ...(longitude != null ? { longitude } : {}),
+        orderAmount: subtotal,
+        paymentMethod: input.paymentMethod,
+        ...(input.shippingMethod
+          ? { methodCode: input.shippingMethod }
+          : {}),
+      });
+
+      if (
+        !eligibility.available ||
+        !eligibility.zone ||
+        !eligibility.area
+      ) {
+        throw ApiError.badRequest(
+          eligibility.message || "Delivery is not available for this address.",
+        );
+      }
+
+      const override = eligibility.feeOverride;
+      let deliveryFee: number;
+
+      if (override) {
+        if (String(override.currency).toUpperCase() !== currency) {
+          throw ApiError.badRequest(
+            "Delivery fee currency does not match your checkout currency.",
+          );
+        }
+        deliveryFee = Number(override.fee);
+      } else {
+        if (currency !== "BDT") {
+          throw ApiError.badRequest(
+            "A delivery fee configured in the checkout currency is required for this area.",
+          );
+        }
+        deliveryFee = Number(eligibility.zone.deliveryFee);
+      }
+
+      const freeThreshold =
+        override?.freeDeliveryThreshold ??
+        eligibility.zone.freeDeliveryThreshold;
+
+      const freeDeliveryApplied =
+        freeThreshold != null && subtotal >= Number(freeThreshold);
+
+      const shippingAmount = roundMoney(
+        freeDeliveryApplied ? 0 : deliveryFee,
+      );
+
+      const deliverySnapshot = {
+        zoneId: eligibility.zone.id,
+        zoneName: eligibility.zone.name,
+        areaId: eligibility.area.id,
+        areaName: eligibility.area.name,
+        ...(eligibility.method
+          ? {
+              methodId: eligibility.method.id,
+              methodCode: eligibility.method.code,
+              methodName: eligibility.method.name,
+              estimatedMinMinutes:
+                eligibility.method.estimatedMinMinutes,
+              estimatedMaxMinutes:
+                eligibility.method.estimatedMaxMinutes,
+            }
+          : {}),
+        fee: shippingAmount,
+        currency,
+        freeDeliveryApplied,
+        ...(eligibility.liveRider
+          ? {
+              distanceKm: eligibility.liveRider.distanceKm,
+              estimatedTravelMinutes:
+                eligibility.liveRider.estimatedTravelMinutes,
+            }
+          : {}),
+      };
 
       const totalAmount = roundMoney(
         subtotal - discountAmount + shippingAmount + taxAmount,
@@ -286,6 +394,7 @@ export const createCheckout = async (
             ...(input.shippingMethod
               ? { shippingMethod: input.shippingMethod }
               : {}),
+            delivery: deliverySnapshot,
             paymentMethod: input.paymentMethod,
             ...(input.couponCode
               ? { couponCode: input.couponCode.toUpperCase() }

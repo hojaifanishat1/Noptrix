@@ -17,6 +17,7 @@ import {
   VacancyQueryInput,
 } from "./vacancy.validator";
 
+import { VACANCY_TYPES, VacancyType } from "./vacancy.model";
 /*
 |--------------------------------------------------------------------------
 | Helpers
@@ -260,6 +261,8 @@ export const createVacancy = async (
 
       skills: input.skills,
 
+      vacancyType: (input.vacancyType ?? VACANCY_TYPES.GENERAL) as VacancyType,
+
       employmentType: input.employmentType as VacancyEmploymentType,
 
       location: input.location?.trim(),
@@ -371,6 +374,13 @@ export const getVacancies = async (query: VacancyQueryInput) => {
     };
   }
 
+  if (query.vacancyType) {
+    filter.vacancyType =
+      query.vacancyType === VACANCY_TYPES.GENERAL
+        ? { $in: [VACANCY_TYPES.GENERAL, null] }
+        : query.vacancyType;
+  }
+
   if (query.employmentType) {
     filter.employmentType = query.employmentType;
   }
@@ -460,6 +470,13 @@ export const getPublicVacancies = async (query: VacancyQueryInput) => {
     };
   }
 
+  if (query.vacancyType) {
+    filter.vacancyType =
+      query.vacancyType === VACANCY_TYPES.GENERAL
+        ? { $in: [VACANCY_TYPES.GENERAL, null] }
+        : query.vacancyType;
+  }
+
   if (query.employmentType) {
     filter.employmentType = query.employmentType;
   }
@@ -507,16 +524,12 @@ export const getPublicVacancies = async (query: VacancyQueryInput) => {
         |--------------------------------------------------------------------------
         */
 
-  filter.$or = [
+  filter.$and = [
     {
-      applicationDeadline: {
-        $exists: false,
-      },
-    },
-    {
-      applicationDeadline: {
-        $gt: new Date(),
-      },
+      $or: [
+        { applicationDeadline: { $exists: false } },
+        { applicationDeadline: { $gt: new Date() } },
+      ],
     },
   ];
 
@@ -691,6 +704,10 @@ export const updateVacancy = async (
 
   if (input.skills !== undefined) {
     vacancy.skills = input.skills;
+  }
+
+  if (input.vacancyType !== undefined) {
+    vacancy.vacancyType = input.vacancyType as VacancyType;
   }
 
   if (input.employmentType !== undefined) {

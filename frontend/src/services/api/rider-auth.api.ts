@@ -9,6 +9,15 @@ import type {
     ApiResponse,
 } from "@/types/api";
 
+export interface RiderLoginVerificationChallenge {
+    verificationRequired: true;
+    challengeId: string;
+    email: string;
+    phone: string;
+    expiresAt: string;
+    resendAvailableAt: string;
+}
+
 export interface RiderLoginResponse {
     riderId: string;
     userId: string;
@@ -52,18 +61,65 @@ export const riderAuthApi = {
     async login(
         input: LoginInput,
     ): Promise<RiderLoginResponse> {
-        const response =
-            await apiClient.post<
-                ApiResponse<RiderLoginResponse>
-            >(
-                "/rider-auth/login",
-                input,
+        try {
+            const response =
+                await apiClient.post<
+                    ApiResponse<RiderLoginResponse>
+                >(
+                    "/rider-auth/login",
+                    input,
+                );
+
+            const data = response.data.data;
+            riderSession.set(data);
+
+            return data;
+        } catch (error: unknown) {
+            const apiError = error as {
+                response?: {
+                    status?: number;
+                    data?: unknown;
+                };
+            };
+
+            console.error(
+                "RIDER LOGIN STATUS:",
+                apiError.response?.status,
             );
+
+            console.error(
+                "RIDER LOGIN RESPONSE:",
+                apiError.response?.data,
+            );
+
+            throw error;
+        }
+    },
+
+    async verifyLogin(input: {
+        challengeId: string;
+        code: string;
+    }): Promise<RiderLoginResponse> {
+        const response = await apiClient.post<
+            ApiResponse<RiderLoginResponse>
+        >("/rider-auth/verify-login", input);
 
         const data = response.data.data;
         riderSession.set(data);
-
         return data;
+    },
+
+    async resendLoginCode(
+        challengeId: string,
+    ): Promise<RiderLoginVerificationChallenge> {
+        const response = await apiClient.post<
+            ApiResponse<RiderLoginVerificationChallenge>
+        >(
+            "/rider-auth/resend-login-code",
+            { challengeId },
+        );
+
+        return response.data.data;
     },
 
     async getMe(): Promise<RiderProfile> {

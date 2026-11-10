@@ -9,7 +9,7 @@ import type { RefundListFilters, ManualRefundInput } from "./refund.types";
 
 const toObjectId = (value: string) => {
   if (!Types.ObjectId.isValid(value)) {
-    throw new ApiError(400, "Invalid ID.");
+    throw ApiError.badRequest("Invalid ID.");
   }
 
   return new Types.ObjectId(value);
@@ -66,7 +66,7 @@ export const getAdminRefundDetails = async (refundId: string) => {
     .lean();
 
   if (!refund) {
-    throw new ApiError(404, "Refund not found.");
+    throw ApiError.notFound("Refund not found.");
   }
 
   return refund;
@@ -155,15 +155,13 @@ export const confirmManualRefund = async (
       }).session(session);
 
       if (!refund) {
-        throw new ApiError(
-          409,
+        throw ApiError.conflict(
           "Only a processing refund can be manually confirmed.",
         );
       }
 
       if (refund.transaction?.providerRefundId) {
-        throw new ApiError(
-          409,
+        throw ApiError.conflict(
           "This refund already has a provider refund reference.",
         );
       }
@@ -174,8 +172,7 @@ export const confirmManualRefund = async (
         );
 
         if (linkedPayment?.method === "online") {
-          throw new ApiError(
-            409,
+          throw ApiError.conflict(
             "Online refunds cannot be manually confirmed. Use the payment provider refund flow.",
           );
         }
@@ -200,7 +197,7 @@ export const confirmManualRefund = async (
       const order = await OrderModel.findById(refund.orderId).session(session);
 
       if (!order) {
-        throw new ApiError(404, "Related order not found.");
+        throw ApiError.notFound("Related order not found.");
       }
 
       const currentRefunded = Number(order.totals.refundedAmount ?? 0);
@@ -208,10 +205,7 @@ export const confirmManualRefund = async (
         Math.round((currentRefunded + refund.amount) * 100) / 100;
 
       if (nextRefunded > order.totals.totalAmount + 0.001) {
-        throw new ApiError(
-          409,
-          "Refund amount would exceed the order total.",
-        );
+        throw ApiError.conflict("Refund amount would exceed the order total.");
       }
 
       order.totals.refundedAmount = nextRefunded;

@@ -51,6 +51,11 @@ export interface IJobApplication extends Document {
   rejectionReason?: string;
 
   notes?: string;
+  riderId?: Types.ObjectId;
+  convertedToRiderAt?: Date;
+  convertedToRiderBy?: Types.ObjectId;
+  riderConversionRequestedAt?: Date;
+  riderConversionRequestedBy?: Types.ObjectId;
 
   createdAt: Date;
   updatedAt: Date;
@@ -162,6 +167,25 @@ const jobApplicationSchema = new Schema<IJobApplication>(
       trim: true,
       maxlength: 5000,
     },
+
+    riderId: {
+      type: Schema.Types.ObjectId,
+      ref: "Rider",
+    },
+    convertedToRiderAt: {
+      type: Date,
+    },
+    convertedToRiderBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
+    riderConversionRequestedAt: {
+      type: Date,
+    },
+    riderConversionRequestedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
   },
   {
     timestamps: true,
@@ -206,6 +230,13 @@ jobApplicationSchema.index({
 | Model
 |--------------------------------------------------------------------------
 */
+
+jobApplicationSchema.index({ riderId: 1 }, { sparse: true });
+jobApplicationSchema.index({
+  status: 1,
+  riderConversionRequestedAt: 1,
+  createdAt: -1,
+});
 
 export const JobApplication: Model<IJobApplication> = model<IJobApplication>(
   "JobApplication",

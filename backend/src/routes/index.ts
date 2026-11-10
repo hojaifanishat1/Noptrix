@@ -30,6 +30,7 @@ import sellerRoutes from "../modules/sellers/seller.routes";
 import sellerProductRoutes from "../modules/seller-products/seller-product.routes";
 import sellerOrderRoutes from "../modules/seller-orders/seller-order.routes";
 import riderRoutes from "../modules/riders/rider.routes";
+import riderInvitationRoutes from "../modules/rider-invitations/rider-invitation.routes";
 import trackingRoutes from "../modules/tracking/tracking.routes";
 import riderAuthRoutes from "../modules/rider-auth/rider-auth.routes";
 import riderEarningRoutes from "../modules/rider-earnings/riderEarning.routes";
@@ -79,6 +80,11 @@ import refundAdminRoutes from "../modules/refunds/refund.admin.routes";
 import refundsRoutes from "../modules/refunds/refund.routes";
 import shippingRoutes from "../modules/shipping/shipping.routes";
 import deliveryRoutes from "../modules/delivery/delivery.routes";
+import deliveryZoneRoutes from "../modules/delivery-zones/delivery-zone.routes";
+import deliveryFeeRoutes from "../modules/delivery-fees/delivery-fee.routes";
+import deliveryAreaRoutes from "../modules/delivery-areas/delivery-area.routes";
+import deliveryMethodRoutes from "../modules/delivery-methods/delivery-method.routes";
+import areaFeeOverrideRoutes from "../modules/area-fee-overrides/area-fee-override.routes";
 import stockTransfersRoutes from "../modules/stock-transfers/stockTransfer.routes";
 import suppliersRoutes from "../modules/suppliers/supplier.routes";
 import purchasesRoutes from "../modules/purchases/purchase.routes";
@@ -220,6 +226,7 @@ router.use("/job-vacancies", vacancyRoutes);
 router.use("/job-applications", jobApplicationRoutes);
 
 router.use("/employee-invitations", employeeInvitationRoutes);
+router.use("/rider-invitations", riderInvitationRoutes);
 
 router.use("/admin-invitations", adminInvitationRoutes);
 
@@ -415,7 +422,12 @@ router.use("/shipping", shippingRoutes);
 
 router.use("/delivery", deliveryRoutes);
 
-router.use("/delivery-zones", deliveryRoutes);
+router.use("/delivery-zones", deliveryZoneRoutes);
+
+router.use("/delivery-fees", deliveryFeeRoutes);
+router.use("/delivery-areas", deliveryAreaRoutes);
+router.use("/delivery-methods", deliveryMethodRoutes);
+router.use("/area-fee-overrides", areaFeeOverrideRoutes);
 
 router.use("/riders", riderRoutes);
 

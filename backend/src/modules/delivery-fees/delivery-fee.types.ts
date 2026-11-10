@@ -20,6 +20,7 @@ export interface IDeliveryFee {
   state?: string;
   city?: string;
   deliveryZoneId?: Types.ObjectId;
+  deliveryMethodId?: Types.ObjectId;
   postalCodes: string[];
 
   method: DeliveryFeeMethod;
@@ -48,6 +49,7 @@ export interface CalculateDeliveryFeeInput {
   city: string;
   postalCode?: string;
   deliveryZoneId?: string;
+  deliveryMethodId?: string;
   orderAmount: number;
   weightKg?: number;
   paymentMethod: "cod" | "online";

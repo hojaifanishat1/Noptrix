@@ -41,12 +41,31 @@ export interface CheckoutItemSnapshot {
   productName: string;
   variantName?: string;
   quantity: number;
+  weightKg?: number;
   trackInventory: boolean;
   allowOverselling: boolean;
   unitPrice: number;
   compareAtPrice?: number;
   currency: string;
   lineSubtotal: number;
+}
+
+
+export interface CheckoutDeliverySnapshot {
+  zoneId: Types.ObjectId;
+  zoneName: string;
+  areaId: Types.ObjectId;
+  areaName: string;
+  methodId?: Types.ObjectId;
+  methodCode?: string;
+  methodName?: string;
+  fee: number;
+  currency: string;
+  freeDeliveryApplied: boolean;
+  estimatedMinMinutes?: number;
+  estimatedMaxMinutes?: number;
+  distanceKm?: number;
+  estimatedTravelMinutes?: number;
 }
 
 export interface CheckoutTotals {
@@ -70,6 +89,7 @@ export interface Checkout {
   shippingAddress: CheckoutAddressSnapshot;
   billingAddress?: CheckoutAddressSnapshot;
   shippingMethod?: string;
+  delivery?: CheckoutDeliverySnapshot;
   paymentMethod: string;
   couponCode?: string;
   totals: CheckoutTotals;

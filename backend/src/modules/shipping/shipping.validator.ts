@@ -78,6 +78,7 @@ export const listShippingSchema = z.object({
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
     status: z.enum(SHIPPING_STATUSES).optional(),
+    search: z.string().trim().max(120).optional(),
     orderId: objectIdSchema.optional(),
     customerId: objectIdSchema.optional(),
     riderId: objectIdSchema.optional(),

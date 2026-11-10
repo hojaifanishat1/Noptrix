@@ -46,6 +46,10 @@ const deliveryFeeSchema = new Schema<IDeliveryFee>(
       type: Schema.Types.ObjectId,
       ref: "DeliveryZone",
     },
+    deliveryMethodId: {
+      type: Schema.Types.ObjectId,
+      ref: "DeliveryMethod",
+    },
     postalCodes: {
       type: [String],
       default: [],
@@ -140,6 +144,7 @@ deliveryFeeSchema.index({
 
 deliveryFeeSchema.index({
   deliveryZoneId: 1,
+  deliveryMethodId: 1,
   status: 1,
   priority: -1,
 });
