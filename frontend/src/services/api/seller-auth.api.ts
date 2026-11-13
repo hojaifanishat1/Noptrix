@@ -1,44 +1,70 @@
-import apiClient from "./client";
+import type { ApiResponse } from "@/types/api";
+import type { Seller } from "./sellers.api";
 
-import type {
-    AuthUser,
-    LoginInput,
-    LoginResponse,
-} from "@/types/auth";
+import { sellerAuthClient } from "./seller-auth-client";
 
-import type {
-    ApiResponse,
-} from "@/types/api";
+import {
+  sellerAuthStorage,
+  sellerTokenStorage,
+} from "@/lib/auth/seller-auth-storage";
+
+export interface SellerLoginInput {
+  email: string;
+  password: string;
+}
+
+export interface SellerTokenResponse {
+  accessToken: string;
+  refreshToken: string;
+  sellerId: string;
+  sessionId: string;
+}
 
 export const sellerAuthApi = {
-    async login(
-        input: LoginInput,
-    ): Promise<LoginResponse> {
-        const response =
-            await apiClient.post<
-                ApiResponse<LoginResponse>
-            >(
-                "/seller-auth/login",
-                input,
-            );
+  async login(input: SellerLoginInput): Promise<SellerTokenResponse> {
+    const response = await sellerAuthClient.post<
+      ApiResponse<SellerTokenResponse>
+    >("/seller-auth/login", input);
 
-        return response.data.data;
-    },
+    const result = response.data.data;
 
-    async getMe(): Promise<AuthUser> {
-        const response =
-            await apiClient.get<
-                ApiResponse<AuthUser>
-            >(
-                "/seller-auth/me",
-            );
+    sellerTokenStorage.set(result.accessToken);
 
-        return response.data.data;
-    },
+    sellerAuthStorage.setRefreshToken(result.refreshToken);
 
-    async logout(): Promise<void> {
-        await apiClient.post(
-            "/seller-auth/logout",
-        );
-    },
+    sellerAuthStorage.setSession({
+      sellerId: result.sellerId,
+      sessionId: result.sessionId,
+    });
+
+    return result;
+  },
+
+  async getMe(): Promise<Seller> {
+    const response = await sellerAuthClient.get<ApiResponse<Seller>>(
+      "/seller-auth/me",
+    );
+
+    return response.data.data;
+  },
+
+  async logout(): Promise<void> {
+    const session = sellerAuthStorage.getSession();
+
+    try {
+      if (session?.sessionId) {
+        await sellerAuthClient.post("/seller-auth/logout", {
+          sessionId: session.sessionId,
+        });
+      }
+    } finally {
+      sellerAuthStorage.clear();
+      sellerTokenStorage.clear();
+    }
+  },
+
+  clearSession(): void {
+    sellerAuthStorage.clear();
+    sellerTokenStorage.clear();
+  },
 };

@@ -8,7 +8,6 @@ import { adminAuthApi } from "@/services/api/admin-auth.api";
 import { employeeAuthApi } from "@/services/api/employee-auth.api";
 import { customerAuthApi } from "@/services/api/customer-auth.api";
 import { ownerAuthApi } from "@/services/api/owner-auth.api";
-import { sellerAuthApi } from "@/services/api/seller-auth.api";
 import { riderAuthApi } from "@/services/api/rider-auth.api";
 
 import { authStorage } from "@/lib/auth/auth-storage";
@@ -335,7 +334,7 @@ export function AuthProvider({
 
                     /*
                     |--------------------------------------------------------------------------
-                    | CUSTOMER / SELLER / RIDER
+                    | CUSTOMER / RIDER
                     |--------------------------------------------------------------------------
                     */
 
@@ -371,11 +370,6 @@ export function AuthProvider({
 
                             break;
                         }
-
-                        case "SELLER":
-                            user =
-                                await sellerAuthApi.getMe();
-                            break;
 
                         case "RIDER":
                             user =

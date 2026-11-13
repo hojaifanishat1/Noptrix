@@ -8,7 +8,10 @@ import { ApiError } from "../../utils/ApiError";
 
 import { getAuthenticatedUserId } from "../../middlewares/userAuth.middleware";
 
-import { getAuthenticatedOwnerId } from "../../middlewares/ownerAuth.middleware";
+import {
+  getAuthenticatedOwnerId,
+  getAuthenticatedOwnerUserId,
+} from "../../middlewares/ownerAuth.middleware";
 
 import {
   CreateSellerApplicationInput,
@@ -26,6 +29,7 @@ import {
   updateSellerApplicationStatus,
   withdrawSellerApplication,
   deleteSellerApplication,
+  resendSellerApplicationInvitation,
 } from "./seller-application.service";
 
 /*
@@ -227,7 +231,8 @@ export const getSellerApplicationController = asyncHandler(
  */
 export const updateSellerApplicationStatusController = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const ownerId = getAuthenticatedOwnerId(req);
+    getAuthenticatedOwnerId(req);
+    const reviewerUserId = getAuthenticatedOwnerUserId(req);
 
     const applicationId = req.params.applicationId;
 
@@ -239,7 +244,7 @@ export const updateSellerApplicationStatusController = asyncHandler(
 
     const application = await updateSellerApplicationStatus(
       applicationId,
-      ownerId,
+      reviewerUserId,
       input,
     );
 
@@ -277,5 +282,37 @@ export const deleteSellerApplicationController = asyncHandler(
           "Seller application deleted successfully.",
         ).serialize(),
       );
+  },
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| Resend Seller Invitation
+|--------------------------------------------------------------------------
+*/
+
+export const resendSellerApplicationInvitationController = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    getAuthenticatedOwnerId(req);
+    const reviewerUserId = getAuthenticatedOwnerUserId(req);
+
+    const applicationId = req.params.applicationId;
+
+    if (typeof applicationId !== "string") {
+      throw ApiError.badRequest("Invalid application ID.");
+    }
+
+    const result = await resendSellerApplicationInvitation(
+      applicationId,
+      reviewerUserId,
+    );
+
+    res.status(200).json(
+      ApiResponse.ok(
+        result,
+        "Seller invitation sent successfully.",
+      ).serialize(),
+    );
   },
 );

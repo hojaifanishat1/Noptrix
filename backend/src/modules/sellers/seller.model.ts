@@ -1,4 +1,4 @@
-import { Document, Model, Schema, Types, model } from "mongoose";
+import { Document, Model, Schema, Types, model, models } from "mongoose";
 
 import {
   SELLER_STATUSES,
@@ -7,75 +7,53 @@ import {
   SellerType,
 } from "./seller.types";
 
-/*
-|--------------------------------------------------------------------------
-| Seller Document
-|--------------------------------------------------------------------------
-*/
-
 export interface ISeller extends Document {
-  userId: Types.ObjectId;
+  sourceApplicationId?: Types.ObjectId;
 
   sellerCode: string;
-
   type: SellerType;
-
   businessName: string;
-
   legalName?: string;
-
   email: string;
-
   phone?: string;
 
+  password: string;
+  failedLoginAttempts: number;
+  lockUntil?: Date;
+  passwordChangedAt?: Date;
+  lastLoginAt?: Date;
+
   taxNumber?: string;
-
   registrationNumber?: string;
-
   description?: string;
-
   logoUrl?: string;
-
   website?: string;
 
   status: SellerStatus;
 
   verifiedAt?: Date;
-
   verifiedBy?: Types.ObjectId;
 
   suspendedAt?: Date;
-
   suspendedBy?: Types.ObjectId;
-
   suspensionReason?: string;
-
   rejectionReason?: string;
 
   notes?: string;
-
   createdBy?: Types.ObjectId;
-
   updatedBy?: Types.ObjectId;
 
   createdAt: Date;
-
   updatedAt: Date;
 }
 
-/*
-|--------------------------------------------------------------------------
-| Schema
-|--------------------------------------------------------------------------
-*/
-
 const sellerSchema = new Schema<ISeller>(
   {
-    userId: {
+    sourceApplicationId: {
       type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
+      ref: "SellerApplication",
       unique: true,
+      sparse: true,
       index: true,
     },
 
@@ -85,7 +63,6 @@ const sellerSchema = new Schema<ISeller>(
       unique: true,
       trim: true,
       uppercase: true,
-      index: true,
       maxlength: 50,
     },
 
@@ -94,7 +71,6 @@ const sellerSchema = new Schema<ISeller>(
       enum: SELLER_TYPES,
       required: true,
       default: "BUSINESS",
-      index: true,
     },
 
     businessName: {
@@ -102,7 +78,6 @@ const sellerSchema = new Schema<ISeller>(
       required: true,
       trim: true,
       maxlength: 200,
-      index: true,
     },
 
     legalName: {
@@ -125,35 +100,30 @@ const sellerSchema = new Schema<ISeller>(
       maxlength: 30,
     },
 
-    taxNumber: {
+    password: {
       type: String,
-      trim: true,
-      maxlength: 100,
+      required: true,
+      select: false,
+      minlength: 8,
     },
 
-    registrationNumber: {
-      type: String,
-      trim: true,
-      maxlength: 100,
+    failedLoginAttempts: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
 
-    description: {
-      type: String,
-      trim: true,
-      maxlength: 5000,
-    },
+    lockUntil: Date,
 
-    logoUrl: {
-      type: String,
-      trim: true,
-      maxlength: 2000,
-    },
+    passwordChangedAt: Date,
 
-    website: {
-      type: String,
-      trim: true,
-      maxlength: 500,
-    },
+    lastLoginAt: Date,
+
+    taxNumber: String,
+    registrationNumber: String,
+    description: String,
+    logoUrl: String,
+    website: String,
 
     status: {
       type: String,
@@ -163,41 +133,23 @@ const sellerSchema = new Schema<ISeller>(
       index: true,
     },
 
-    verifiedAt: {
-      type: Date,
-    },
+    verifiedAt: Date,
 
     verifiedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
     },
 
-    suspendedAt: {
-      type: Date,
-    },
+    suspendedAt: Date,
 
     suspendedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
     },
 
-    suspensionReason: {
-      type: String,
-      trim: true,
-      maxlength: 2000,
-    },
-
-    rejectionReason: {
-      type: String,
-      trim: true,
-      maxlength: 2000,
-    },
-
-    notes: {
-      type: String,
-      trim: true,
-      maxlength: 5000,
-    },
+    suspensionReason: String,
+    rejectionReason: String,
+    notes: String,
 
     createdBy: {
       type: Schema.Types.ObjectId,
@@ -214,36 +166,16 @@ const sellerSchema = new Schema<ISeller>(
   },
 );
 
-/*
-|--------------------------------------------------------------------------
-| Indexes
-|--------------------------------------------------------------------------
-*/
+sellerSchema.index({ email: 1 }, { unique: true });
 
-sellerSchema.index({
-  status: 1,
-  createdAt: -1,
-});
+sellerSchema.index({ status: 1, createdAt: -1 });
 
-sellerSchema.index({
-  type: 1,
-  status: 1,
-});
+sellerSchema.index({ type: 1, status: 1 });
 
-sellerSchema.index({
-  businessName: 1,
-  status: 1,
-});
+sellerSchema.index({ businessName: 1, status: 1 });
 
-sellerSchema.index({
-  email: 1,
-  status: 1,
-});
+sellerSchema.index({ phone: 1 });
 
-/*
-|--------------------------------------------------------------------------
-| Model
-|--------------------------------------------------------------------------
-*/
-
-export const Seller: Model<ISeller> = model<ISeller>("Seller", sellerSchema);
+export const Seller: Model<ISeller> =
+  (models.Seller as Model<ISeller>) ??
+  model<ISeller>("Seller", sellerSchema);

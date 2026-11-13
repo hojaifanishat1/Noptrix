@@ -1,6 +1,8 @@
 import { Types } from "mongoose";
 
 import { ApiError } from "../../utils/ApiError";
+import { getSettingsByCategory } from "../settings/settings.service";
+import { createSellerInvitation } from "../seller-invitations/seller-invitation.service";
 
 import {
   SellerApplication,
@@ -84,6 +86,14 @@ export const createSellerApplication = async (
   input: CreateSellerApplicationInput,
 ): Promise<ISellerApplication> => {
   const applicantObjectId = validateObjectId(applicantId, "applicantId");
+
+  const applicationSettings = await getSettingsByCategory("seller-applications");
+
+  if (applicationSettings.values.enabled !== true) {
+    throw ApiError.forbidden("Seller application submissions are currently disabled.", {
+      code: "SELLER_APPLICATIONS_DISABLED",
+    });
+  }
 
   const email = normalizeEmail(input.email);
 
@@ -420,7 +430,53 @@ export const updateSellerApplicationStatus = async (
 
   await application.save();
 
+  /*
+   * Approval does not create a Seller profile.
+   * It only sends an invitation to the existing customer account.
+   * If email delivery fails, the application remains APPROVED and
+   * an Owner can use the resend endpoint.
+   */
+  if (nextStatus === "APPROVED") {
+    await createSellerInvitation(
+      application._id.toString(),
+      reviewerObjectId.toString(),
+    );
+  }
+
   return application;
+};
+
+/*
+|--------------------------------------------------------------------------
+| Resend Seller Invitation
+|--------------------------------------------------------------------------
+*/
+
+export const resendSellerApplicationInvitation = async (
+  applicationId: string,
+  reviewerUserId: string,
+): Promise<{ sent: boolean; expiresAt: Date }> => {
+  const applicationObjectId = validateObjectId(applicationId, "applicationId");
+  const reviewerObjectId = validateObjectId(reviewerUserId, "reviewerUserId");
+
+  const application = await SellerApplication.findById(applicationObjectId)
+    .select("_id status")
+    .exec();
+
+  if (!application) {
+    throw ApiError.notFound("Seller application not found.");
+  }
+
+  if (application.status !== "APPROVED") {
+    throw ApiError.badRequest(
+      "Only approved seller applications can receive an invitation.",
+    );
+  }
+
+  return createSellerInvitation(
+    applicationObjectId.toString(),
+    reviewerObjectId.toString(),
+  );
 };
 
 /*

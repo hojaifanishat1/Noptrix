@@ -3,6 +3,10 @@ import { User } from "../../modules/users/user.model";
 import { sendEmail } from "../email.service";
 
 import {
+  renderNotificationTemplateByEvent,
+} from "../../modules/notifications/notification-template.service";
+
+import {
   registerNotificationProvider,
   NOTIFICATION_CHANNELS,
   NOTIFICATION_DELIVERY_STATUSES,
@@ -118,18 +122,44 @@ const emailNotificationProvider: NotificationProviderAdapter = {
         */
 
     try {
-      const htmlMessage = escapeHtml(message).replace(/\n/g, "<br />");
+      let finalSubject = subject;
+      let finalMessage = message;
+      let eventTemplateResolved = false;
+
+      const templateEvent =
+        typeof metadata.templateEvent === "string"
+          ? metadata.templateEvent.trim()
+          : "";
+
+      if (templateEvent) {
+        const rendered = await renderNotificationTemplateByEvent({
+          event: templateEvent,
+          channel: NOTIFICATION_CHANNELS.EMAIL,
+          locale: templateLocale ?? "en",
+          variables: templateVariables,
+        });
+
+        if (rendered) {
+          finalSubject = rendered.title;
+          finalMessage = rendered.message;
+          eventTemplateResolved = true;
+        }
+      }
+
+      const htmlMessage = escapeHtml(finalMessage).replace(/\n/g, "<br />");
 
       const result = await sendEmail({
         to: recipientEmail,
 
-        subject: subject.trim(),
+        subject: finalSubject.trim(),
 
-        text: message,
+        text: finalMessage,
 
         html: htmlMessage,
 
-        templateKey: templateKey || undefined,
+        templateKey: eventTemplateResolved
+          ? undefined
+          : templateKey || undefined,
 
         templateLocale,
 
@@ -168,6 +198,10 @@ const emailNotificationProvider: NotificationProviderAdapter = {
           error,
           recipientEmail,
           templateKey,
+          templateEvent:
+            typeof metadata.templateEvent === "string"
+              ? metadata.templateEvent
+              : undefined,
         },
         "Notification email delivery failed.",
       );

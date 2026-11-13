@@ -23,10 +23,6 @@ import {
 } from "@/services/api/rider-auth.api";
 
 import {
-    sellerAuthApi,
-} from "@/services/api/seller-auth.api";
-
-import {
     useAuthStore,
 } from "@/stores/auth.store";
 
@@ -400,11 +396,6 @@ export const restoreAuthSession =
                     await customerAuthApi.getMe();
                 break;
 
-            case "SELLER":
-                user =
-                    await sellerAuthApi.getMe();
-                break;
-
             case "RIDER":
                 user =
                     await riderAuthApi.getMe();
@@ -461,10 +452,6 @@ export const logout = async (): Promise<void> => {
                         user.id,
                     );
                 }
-                break;
-
-            case "SELLER":
-                await sellerAuthApi.logout();
                 break;
 
             case "RIDER":

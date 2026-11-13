@@ -160,8 +160,8 @@ const addMessageNames = async (
         .select("_id userId roleId")
         .lean()
         .exec(),
-      Seller.find({ userId: { $in: userIds } })
-        .select("userId")
+      Seller.find({ _id: { $in: messageObjectIds } })
+        .select("_id businessName")
         .lean()
         .exec(),
       Rider.find({ userId: { $in: userIds } })
@@ -171,6 +171,9 @@ const addMessageNames = async (
     ],
   );
   const names = new Map(users.map((user) => [user._id.toString(), user.name]));
+  sellers.forEach((seller) => {
+    names.set(seller._id.toString(), seller.businessName);
+  });
   const roleIds = [
     ...new Set(
       [...admins, ...employees].map((profile) => profile.roleId.toString()),
@@ -199,7 +202,7 @@ const addMessageNames = async (
       employee.jobTitle?.trim() || roleNames.get(employee.roleId.toString()),
     );
   });
-  sellers.forEach((seller) => assignRole(seller.userId, "Seller"));
+  sellers.forEach((seller) => assignRole(seller._id, "Seller"));
   riders.forEach((rider) => assignRole(rider.userId, "Rider"));
   const resolveUserId = (id: string): string => legacyUserIds.get(id) ?? id;
   const resolveName = (id: string): string =>
@@ -577,7 +580,7 @@ export const getMessageRecipients = async (
           status: "ACTIVE",
           ...profileSearch,
         })
-          .select("userId businessName email")
+          .select("_id businessName email")
           .lean()
           .exec(),
     input.accountType && input.accountType !== "RIDER"
@@ -610,9 +613,9 @@ export const getMessageRecipients = async (
     });
   }
   for (const seller of sellers) {
-    const userId = seller.userId.toString();
-    accountTypes.set(userId, "SELLER");
-    profiles.set(userId, {
+    const sellerId = seller._id.toString();
+    accountTypes.set(sellerId, "SELLER");
+    profiles.set(sellerId, {
       profileName: seller.businessName,
       email: seller.email,
     });

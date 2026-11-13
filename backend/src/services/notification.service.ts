@@ -640,8 +640,6 @@ export const dispatchNotification = async (
 
       deliveries.push(unavailableResult);
 
-      failedDeliveries += 1;
-
       continue;
     }
 
@@ -680,14 +678,25 @@ export const dispatchNotification = async (
 
   const updatedAt = new Date();
 
+  const activeDeliveries = deliveries.filter(
+    (delivery) =>
+      delivery.status !== NOTIFICATION_DELIVERY_STATUSES.SKIPPED,
+  );
+
   let status: NotificationStatus;
 
-  if (successfulDeliveries === notification.channels.length) {
+  if (
+    activeDeliveries.length > 0 &&
+    successfulDeliveries === activeDeliveries.length
+  ) {
     status = NOTIFICATION_STATUSES.SENT;
-  } else if (successfulDeliveries > 0) {
-    status = NOTIFICATION_STATUSES.PARTIAL;
-  } else if (failedDeliveries > 0) {
+  } else if (
+    activeDeliveries.length > 0 &&
+    failedDeliveries === activeDeliveries.length
+  ) {
     status = NOTIFICATION_STATUSES.FAILED;
+  } else if (successfulDeliveries > 0 && failedDeliveries > 0) {
+    status = NOTIFICATION_STATUSES.PARTIAL;
   } else {
     status = NOTIFICATION_STATUSES.PENDING;
   }

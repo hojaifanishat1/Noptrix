@@ -1,4 +1,3 @@
-
 import apiClient from "./client";
 import type { ApiResponse } from "@/types/api";
 
@@ -68,6 +67,22 @@ export interface SellerApplicationListParams {
   type?: SellerApplicationType;
 }
 
+export interface CreateSellerApplicationInput {
+  businessName: string;
+  legalName?: string;
+  type: SellerApplicationType;
+  email: string;
+  phone?: string;
+  taxNumber?: string;
+  registrationNumber?: string;
+  description?: string;
+  logoUrl?: string;
+  website?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+}
+
 export interface UpdateSellerApplicationStatusInput {
   status: SellerApplicationStatus;
   rejectionReason?: string;
@@ -75,6 +90,61 @@ export interface UpdateSellerApplicationStatusInput {
 }
 
 export const sellerApplicationsApi = {
+  // Customer: submit a new application
+  async create(
+    input: CreateSellerApplicationInput,
+  ): Promise<SellerApplication> {
+    const response = await apiClient.post<ApiResponse<SellerApplication>>(
+      "/seller-applications",
+      input,
+    );
+
+    return response.data.data;
+  },
+
+  // Customer: get own applications
+  async listMine(
+    params: { page: number; limit: number },
+  ): Promise<SellerApplicationListResult> {
+    const response = await apiClient.get<
+      ApiResponse<SellerApplicationListResult>
+    >("/seller-applications/me", { params });
+
+    return response.data.data;
+  },
+
+  // Customer: get own application details
+  async getMine(applicationId: string): Promise<SellerApplication> {
+    const response = await apiClient.get<ApiResponse<SellerApplication>>(
+      `/seller-applications/me/${applicationId}`,
+    );
+
+    return response.data.data;
+  },
+
+  // Customer: update own application
+  async updateMine(
+    applicationId: string,
+    input: Partial<CreateSellerApplicationInput>,
+  ): Promise<SellerApplication> {
+    const response = await apiClient.patch<ApiResponse<SellerApplication>>(
+      `/seller-applications/me/${applicationId}`,
+      input,
+    );
+
+    return response.data.data;
+  },
+
+  // Customer: withdraw own application
+  async withdrawMine(applicationId: string): Promise<SellerApplication> {
+    const response = await apiClient.post<ApiResponse<SellerApplication>>(
+      `/seller-applications/me/${applicationId}/withdraw`,
+    );
+
+    return response.data.data;
+  },
+
+  // Admin/Owner: list applications
   async list(
     params: SellerApplicationListParams,
   ): Promise<SellerApplicationListResult> {
@@ -103,5 +173,11 @@ export const sellerApplicationsApi = {
     );
 
     return response.data.data;
+  },
+
+  async resendInvitation(applicationId: string): Promise<void> {
+    await apiClient.post<ApiResponse<unknown>>(
+      `/seller-applications/${applicationId}/resend-invitation`,
+    );
   },
 };

@@ -550,6 +550,35 @@ export const updateJobApplicationStatus = async (
       })();
 
       /*
+       * Event identifier for channel-specific notification templates.
+       * Each application status can have its own EMAIL template.
+       */
+      const templateEvent = (() => {
+        switch (nextStatus) {
+          case "UNDER_REVIEW":
+            return "JOB_APPLICATION_UNDER_REVIEW";
+
+          case "SHORTLISTED":
+            return "JOB_APPLICATION_SHORTLISTED";
+
+          case "INTERVIEW":
+            return "JOB_APPLICATION_INTERVIEW";
+
+          case "SELECTED":
+            return "JOB_APPLICATION_SELECTED";
+
+          case "REJECTED":
+            return "JOB_APPLICATION_REJECTED";
+
+          case "WITHDRAWN":
+            return "JOB_APPLICATION_WITHDRAWN";
+
+          default:
+            return "JOB_APPLICATION_STATUS_UPDATED";
+        }
+      })();
+
+      /*
                 |--------------------------------------------------------------------------
                 | Action URL
                 |--------------------------------------------------------------------------
@@ -774,6 +803,8 @@ export const updateJobApplicationStatus = async (
 
           templateKey,
 
+          templateEvent,
+
           templateLocale: "en",
 
           templateVariables,
@@ -817,6 +848,8 @@ export const updateJobApplicationStatus = async (
           actionUrl,
 
           templateKey,
+
+          templateEvent,
 
           eventKey,
         },

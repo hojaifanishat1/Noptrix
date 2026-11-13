@@ -1,4 +1,3 @@
-
 import apiClient from "./client";
 import type { ApiResponse } from "@/types/api";
 
@@ -17,17 +16,8 @@ export interface SellerActor {
   email?: string;
 }
 
-export interface SellerUser {
-  _id: string;
-  name?: string;
-  email?: string;
-  phone?: string;
-  status?: string;
-}
-
 export interface Seller {
   _id: string;
-  userId: string | SellerUser;
   sellerCode: string;
   type: SellerType;
   businessName: string;

@@ -1,9 +1,3 @@
-/*
-|--------------------------------------------------------------------------
-| NOPTRIX Settings Types
-|--------------------------------------------------------------------------
-*/
-
 export const SETTINGS_CATEGORIES = [
   "general",
   "business",
@@ -14,6 +8,7 @@ export const SETTINGS_CATEGORIES = [
   "shipping",
   "email",
   "sms",
+  "seller-applications",
 ] as const;
 
 export type SettingsCategory = (typeof SETTINGS_CATEGORIES)[number];

@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { Types } from "mongoose";
 
 import { ApiError } from "../../utils/ApiError";
@@ -68,31 +69,17 @@ export const createSeller = async (
   input: CreateSellerInput,
   actorId?: string,
 ) => {
-  const userId = validateObjectId(input.userId, "userId");
-
   const normalizedEmail = normalizeEmail(input.email);
-
   const normalizedSellerCode = normalizeSellerCode(input.sellerCode);
 
-  const existingSellerByUser = await Seller.findOne({
-    userId,
-  });
-
-  if (existingSellerByUser) {
-    throw ApiError.conflict("A seller already exists for this user.");
-  }
-
-  const existingSellerByCode = await Seller.findOne({
-    sellerCode: normalizedSellerCode,
-  });
+  const [existingSellerByCode, existingSellerByEmail] = await Promise.all([
+    Seller.findOne({ sellerCode: normalizedSellerCode }),
+    Seller.findOne({ email: normalizedEmail }),
+  ]);
 
   if (existingSellerByCode) {
     throw ApiError.conflict("Seller code already exists.");
   }
-
-  const existingSellerByEmail = await Seller.findOne({
-    email: normalizedEmail,
-  });
 
   if (existingSellerByEmail) {
     throw ApiError.conflict("Seller email already exists.");
@@ -102,37 +89,25 @@ export const createSeller = async (
     ? validateObjectId(actorId, "actorId")
     : undefined;
 
+  const password = await bcrypt.hash(input.password, 12);
+
   const seller = await Seller.create({
-    userId,
-
     sellerCode: normalizedSellerCode,
-
     type: input.type,
-
     businessName: input.businessName,
-
     legalName: input.legalName,
-
     email: normalizedEmail,
-
     phone: input.phone,
-
+    password,
+    failedLoginAttempts: 0,
     taxNumber: input.taxNumber,
-
     registrationNumber: input.registrationNumber,
-
     description: input.description,
-
     logoUrl: input.logoUrl,
-
     website: input.website,
-
     status: "PENDING",
-
     notes: input.notes,
-
     createdBy: actorObjectId,
-
     updatedBy: actorObjectId,
   });
 
@@ -149,7 +124,6 @@ export const getSellerById = async (sellerId: string) => {
   const sellerObjectId = validateObjectId(sellerId, "sellerId");
 
   const seller = await Seller.findById(sellerObjectId)
-    .populate("userId", "name email phone status")
     .populate("verifiedBy", "name email")
     .populate("suspendedBy", "name email")
     .populate("createdBy", "name email")
@@ -162,28 +136,6 @@ export const getSellerById = async (sellerId: string) => {
   return seller;
 };
 
-/*
-|--------------------------------------------------------------------------
-| Get Seller By User
-|--------------------------------------------------------------------------
-*/
-
-export const getSellerByUserId = async (userId: string) => {
-  const userObjectId = validateObjectId(userId, "userId");
-
-  const seller = await Seller.findOne({
-    userId: userObjectId,
-  })
-    .populate("userId", "name email phone status")
-    .populate("verifiedBy", "name email")
-    .populate("suspendedBy", "name email");
-
-  if (!seller) {
-    throw ApiError.notFound("Seller not found.");
-  }
-
-  return seller;
-};
 
 /*
 |--------------------------------------------------------------------------
@@ -192,7 +144,7 @@ export const getSellerByUserId = async (userId: string) => {
 */
 
 export const getAllSellers = async (query: SellerQueryInput) => {
-  const { page, limit, status, type, search, userId } = query;
+  const { page, limit, status, type, search } = query;
 
   const filter: Record<string, unknown> = {};
 
@@ -204,9 +156,6 @@ export const getAllSellers = async (query: SellerQueryInput) => {
     filter.type = type;
   }
 
-  if (userId) {
-    filter.userId = validateObjectId(userId, "userId");
-  }
 
   if (search) {
     const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -236,8 +185,7 @@ export const getAllSellers = async (query: SellerQueryInput) => {
 
   const [sellers, total] = await Promise.all([
     Seller.find(filter)
-      .populate("userId", "name email phone status")
-      .populate("verifiedBy", "name email")
+        .populate("verifiedBy", "name email")
       .sort({
         createdAt: -1,
       })

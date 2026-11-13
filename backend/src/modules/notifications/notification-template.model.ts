@@ -185,12 +185,21 @@ notificationTemplateSchema.index(
   },
 );
 
-notificationTemplateSchema.index({
-  event: 1,
-  channel: 1,
-  locale: 1,
-  status: 1,
-});
+// Only one ACTIVE template per Event + Channel + Locale.
+notificationTemplateSchema.index(
+  {
+    event: 1,
+    channel: 1,
+    locale: 1,
+  },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: NOTIFICATION_TEMPLATE_STATUSES.ACTIVE,
+    },
+    name: "uniq_active_notification_template_event_channel_locale",
+  },
+);
 
 notificationTemplateSchema.index({
   status: 1,

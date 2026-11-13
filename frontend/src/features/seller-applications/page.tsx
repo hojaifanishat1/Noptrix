@@ -256,6 +256,26 @@ export default function AdminSellerApplicationsPage() {
     }
   };
 
+  const resendInvitation = async (application: SellerApplication) => {
+    const confirmed = window.confirm(
+      `Resend the seller invitation to ${application.email}?`,
+    );
+
+    if (!confirmed) return;
+
+    setActionId(application._id);
+
+    try {
+      await sellerApplicationsApi.resendInvitation(application._id);
+      window.alert("Seller invitation has been sent successfully.");
+      await loadApplications();
+    } catch (requestError) {
+      window.alert(getErrorMessage(requestError));
+    } finally {
+      setActionId("");
+    }
+  };
+
   const resetFilters = () => {
     setSearch("");
     setStatus("");
@@ -386,6 +406,19 @@ export default function AdminSellerApplicationsPage() {
                 Reject
               </button>
             </>
+          )}
+
+          {application.status === "APPROVED" && (
+            <button
+              type="button"
+              disabled={actionId === application._id}
+              onClick={() => void resendInvitation(application)}
+              className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {actionId === application._id
+                ? "Sending..."
+                : "Resend Invitation"}
+            </button>
           )}
         </div>
       ),

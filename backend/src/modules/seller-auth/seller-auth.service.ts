@@ -1,221 +1,163 @@
+import bcrypt from "bcryptjs";
 import { Types } from "mongoose";
 
 import { ApiError } from "../../utils/ApiError";
-
-import { generateTokenPair, verifyRefreshToken } from "../../utils/token";
-
 import {
-  createSession,
-  findSessionByRefreshToken,
-  revokeUserSession,
-  revokeAllUserSessions,
-  touchSession,
-} from "../sessions/session.service";
+  generateTokenPair,
+  verifyRefreshToken,
+} from "../../utils/token";
 
+import { Seller } from "../sellers/seller.model";
 import {
-  findUserForAuthentication,
-  verifyUserPassword,
-  updateLastLogin,
-  recordFailedLogin,
-  resetFailedLoginAttempts,
-  isUserLocked,
-  changeUserPassword,
-} from "../users/user.service";
-
-import { getSellerByUserId } from "../sellers/seller.service";
+  createSellerSession,
+  findSellerSessionByRefreshToken,
+  findActiveSellerSession,
+  revokeSellerSession,
+  revokeAllSellerSessions,
+  touchSellerSession,
+} from "./seller-session.service";
 
 import type { SellerLoginInput } from "./seller-auth.validator";
-
 import type {
   SellerLoginResult,
   SellerRefreshResult,
 } from "./seller-auth.types";
 
-/*
-|--------------------------------------------------------------------------
-| Helpers
-|--------------------------------------------------------------------------
-*/
+const SALT_ROUNDS = 12;
 
-const toObjectIdString = (value: Types.ObjectId): string => value.toString();
-
-const getRefreshTokenExpirationDate = (refreshToken: string): Date => {
-  const payload = verifyRefreshToken(refreshToken);
+const getRefreshTokenExpirationDate = (token: string): Date => {
+  const payload = verifyRefreshToken(token);
 
   if (typeof payload.exp !== "number") {
-    throw ApiError.internal("Refresh token expiration is invalid.", {
-      code: "INVALID_REFRESH_EXPIRATION",
-    });
+    throw ApiError.internal("Refresh token expiration is invalid.");
   }
 
   return new Date(payload.exp * 1000);
 };
 
-/*
-|--------------------------------------------------------------------------
-| Find User For Login
-|--------------------------------------------------------------------------
-*/
+const normalizeEmail = (email: string): string =>
+  email.trim().toLowerCase();
 
-const findUserForLogin = async (input: SellerLoginInput) => {
-  if (input.email) {
-    return findUserForAuthentication(input.email);
+const findSellerForLogin = async (input: SellerLoginInput) => {
+  const filter = input.email
+    ? { email: normalizeEmail(input.email) }
+    : input.phone
+      ? { phone: input.phone.trim() }
+      : null;
+
+  if (!filter) {
+    throw ApiError.badRequest("Email or phone is required.");
   }
 
-  if (input.phone) {
-    return findUserForAuthentication(input.phone);
-  }
-
-  throw ApiError.badRequest("Email or phone is required.", {
-    code: "LOGIN_IDENTIFIER_REQUIRED",
-  });
+  return Seller.findOne(filter).select("+password");
 };
 
-/*
-|--------------------------------------------------------------------------
-| Login Seller
-|--------------------------------------------------------------------------
-*/
-
-export const loginSeller = async (
-  input: SellerLoginInput,
-  metadata?: {
-    readonly userAgent?: string;
-    readonly ipAddress?: string;
-    readonly deviceId?: string;
-  },
-): Promise<SellerLoginResult> => {
-  const user = await findUserForLogin(input);
-
-  if (!user) {
-    throw ApiError.unauthorized("Invalid email/phone or password.", {
-      code: "INVALID_CREDENTIALS",
-    });
-  }
-
-  const userId = toObjectIdString(user._id);
-
-  /*
-    |--------------------------------------------------------------------------
-    | Account Lock
-    |--------------------------------------------------------------------------
-    */
-
-  if (isUserLocked(user)) {
+const ensureSellerCanLogin = (seller: {
+  status: string;
+  lockUntil?: Date;
+}) => {
+  if (seller.lockUntil && seller.lockUntil > new Date()) {
     throw ApiError.unauthorized("Account is temporarily locked.", {
       code: "ACCOUNT_LOCKED",
     });
   }
-
-  /*
-    |--------------------------------------------------------------------------
-    | Password Verification
-    |--------------------------------------------------------------------------
-    */
-
-  const passwordValid = await verifyUserPassword(user, input.password);
-
-  if (!passwordValid) {
-    await recordFailedLogin(userId);
-
-    throw ApiError.unauthorized("Invalid email/phone or password.", {
-      code: "INVALID_CREDENTIALS",
-    });
-  }
-
-  /*
-    |--------------------------------------------------------------------------
-    | Seller Profile
-    |--------------------------------------------------------------------------
-    */
-
-  const seller = await getSellerByUserId(userId);
-
-  if (!seller) {
-    throw ApiError.forbidden("This account is not registered as a seller.", {
-      code: "SELLER_PROFILE_NOT_FOUND",
-    });
-  }
-
-  /*
-    |--------------------------------------------------------------------------
-    | Seller Status
-    |--------------------------------------------------------------------------
-    */
 
   if (seller.status !== "ACTIVE") {
     throw ApiError.forbidden(
       `Seller account is ${seller.status.toLowerCase()}.`,
       {
         code: "SELLER_ACCOUNT_INACTIVE",
-        details: {
-          status: seller.status,
-        },
+        details: { status: seller.status },
       },
     );
   }
+};
 
-  /*
-    |--------------------------------------------------------------------------
-    | Successful Login
-    |--------------------------------------------------------------------------
-    */
-
-  await resetFailedLoginAttempts(userId);
-
-  await updateLastLogin(userId);
-
-  /*
-    |--------------------------------------------------------------------------
-    | Token Pair
-    |--------------------------------------------------------------------------
-    |
-    | JWT sub = Seller ID
-    |
-    */
-
-  const tokenPair = generateTokenPair(seller._id.toString(), {
+const createSellerTokensAndSession = async (
+  sellerId: Types.ObjectId,
+  metadata?: {
+    userAgent?: string;
+    ipAddress?: string;
+    deviceId?: string;
+  },
+) => {
+  const tokenPair = generateTokenPair(sellerId.toString(), {
     role: "SELLER",
   });
 
-  /*
-    |--------------------------------------------------------------------------
-    | Session
-    |--------------------------------------------------------------------------
-    |
-    | Session belongs to canonical User ID.
-    |
-    */
+  const sessionId = new Types.ObjectId();
 
-  const expiresAt = getRefreshTokenExpirationDate(tokenPair.refreshToken);
-
-  const session = await createSession({
-    userId,
+  const session = await createSellerSession({
+    sessionId: sessionId.toString(),
+    sellerId: sellerId.toString(),
     refreshToken: tokenPair.refreshToken,
+    expiresAt: getRefreshTokenExpirationDate(tokenPair.refreshToken),
     userAgent: metadata?.userAgent,
     ipAddress: metadata?.ipAddress,
     deviceId: metadata?.deviceId,
-    expiresAt,
   });
 
   return {
     accessToken: tokenPair.accessToken,
-
     refreshToken: tokenPair.refreshToken,
-
-    sellerId: seller._id,
-
-    userId: user._id,
-
+    sellerId,
     sessionId: session._id,
   };
 };
 
-/*
-|--------------------------------------------------------------------------
-| Refresh Seller Token
-|--------------------------------------------------------------------------
-*/
+export const loginSeller = async (
+  input: SellerLoginInput,
+  metadata?: {
+    userAgent?: string;
+    ipAddress?: string;
+    deviceId?: string;
+  },
+): Promise<SellerLoginResult> => {
+  const seller = await findSellerForLogin(input);
+
+  if (!seller) {
+    throw ApiError.unauthorized("Invalid email/phone or password.", {
+      code: "INVALID_CREDENTIALS",
+    });
+  }
+
+  if (seller.lockUntil && seller.lockUntil > new Date()) {
+    throw ApiError.unauthorized("Account is temporarily locked.", {
+      code: "ACCOUNT_LOCKED",
+    });
+  }
+
+  const passwordValid = await bcrypt.compare(
+    input.password,
+    seller.password,
+  );
+
+  if (!passwordValid) {
+    seller.failedLoginAttempts = (seller.failedLoginAttempts ?? 0) + 1;
+
+    if (seller.failedLoginAttempts >= 5) {
+      seller.lockUntil = new Date(Date.now() + 15 * 60 * 1000);
+    }
+
+    await seller.save();
+
+    throw ApiError.unauthorized("Invalid email/phone or password.", {
+      code: "INVALID_CREDENTIALS",
+    });
+  }
+
+  ensureSellerCanLogin(seller);
+
+  seller.failedLoginAttempts = 0;
+  seller.lockUntil = undefined;
+  seller.lastLoginAt = new Date();
+  await seller.save();
+
+  return createSellerTokensAndSession(
+    seller._id as Types.ObjectId,
+    metadata,
+  );
+};
 
 export const refreshSellerToken = async (
   refreshToken: string,
@@ -230,13 +172,7 @@ export const refreshSellerToken = async (
     });
   }
 
-  /*
-    |--------------------------------------------------------------------------
-    | Session
-    |--------------------------------------------------------------------------
-    */
-
-  const session = await findSessionByRefreshToken(refreshToken);
+  const session = await findSellerSessionByRefreshToken(refreshToken);
 
   if (!session) {
     throw ApiError.unauthorized("Session is invalid, expired, or revoked.", {
@@ -244,108 +180,44 @@ export const refreshSellerToken = async (
     });
   }
 
-  const userId = session.userId.toString();
+  const sellerId = session.sellerId.toString();
 
-  /*
-    |--------------------------------------------------------------------------
-    | Seller Profile
-    |--------------------------------------------------------------------------
-    */
-
-  const seller = await getSellerByUserId(userId);
-
-  if (!seller) {
-    await revokeUserSession(userId, session._id.toString());
-
-    throw ApiError.forbidden("Seller profile was not found.", {
-      code: "SELLER_PROFILE_NOT_FOUND",
-    });
-  }
-
-  /*
-    |--------------------------------------------------------------------------
-    | Seller Status
-    |--------------------------------------------------------------------------
-    */
-
-  if (seller.status !== "ACTIVE") {
-    await revokeUserSession(userId, session._id.toString());
-
-    throw ApiError.forbidden("Seller account is not active.", {
-      code: "SELLER_ACCOUNT_INACTIVE",
-    });
-  }
-
-  /*
-    |--------------------------------------------------------------------------
-    | Token Identity
-    |--------------------------------------------------------------------------
-    */
-
-  if (payload.sub !== seller._id.toString()) {
-    await revokeUserSession(userId, session._id.toString());
+  if (payload.sub !== sellerId || payload.role !== "SELLER") {
+    await revokeSellerSession(sellerId, session._id.toString());
 
     throw ApiError.unauthorized("Invalid refresh token.", {
       code: "TOKEN_IDENTITY_MISMATCH",
     });
   }
 
-  /*
-    |--------------------------------------------------------------------------
-    | Token Rotation
-    |--------------------------------------------------------------------------
-    */
+  const seller = await Seller.findById(sellerId);
 
-  const newTokenPair = generateTokenPair(seller._id.toString(), {
-    role: "SELLER",
-  });
+  if (!seller || seller.status !== "ACTIVE") {
+    await revokeSellerSession(sellerId, session._id.toString());
 
-  const newExpiresAt = getRefreshTokenExpirationDate(newTokenPair.refreshToken);
+    throw ApiError.forbidden("Seller account is not active.", {
+      code: "SELLER_ACCOUNT_INACTIVE",
+    });
+  }
 
-  /*
-    |--------------------------------------------------------------------------
-    | Revoke Old Session
-    |--------------------------------------------------------------------------
-    */
+  await revokeSellerSession(sellerId, session._id.toString());
 
-  await revokeUserSession(userId, session._id.toString());
-
-  /*
-    |--------------------------------------------------------------------------
-    | Create New Session
-    |--------------------------------------------------------------------------
-    */
-
-  const newSession = await createSession({
-    userId,
-    refreshToken: newTokenPair.refreshToken,
-    expiresAt: newExpiresAt,
-  });
-
-  return {
-    accessToken: newTokenPair.accessToken,
-
-    refreshToken: newTokenPair.refreshToken,
-
-    sellerId: seller._id,
-
-    userId: session.userId,
-
-    sessionId: newSession._id,
-  };
+  return createSellerTokensAndSession(seller._id as Types.ObjectId);
 };
 
-/*
-|--------------------------------------------------------------------------
-| Logout Seller
-|--------------------------------------------------------------------------
-*/
-
 export const logoutSeller = async (
-  userId: string,
+  sellerId: string,
   sessionId: string,
 ): Promise<void> => {
-  const revoked = await revokeUserSession(userId, sessionId);
+  const session = await findActiveSellerSession(sellerId, sessionId);
+
+  if (!session) {
+    throw ApiError.unauthorized("Session is invalid or already revoked.", {
+      code: "INVALID_SESSION",
+    });
+  }
+
+  const revoked = await revokeSellerSession(sellerId, sessionId);
 
   if (!revoked) {
     throw ApiError.unauthorized("Session is invalid or already revoked.", {
@@ -354,58 +226,42 @@ export const logoutSeller = async (
   }
 };
 
-/*
-|--------------------------------------------------------------------------
-| Change Seller Password
-|--------------------------------------------------------------------------
-*/
-
 export const changeSellerPassword = async (
-  userId: string,
+  sellerId: string,
   currentPassword: string,
   newPassword: string,
 ): Promise<void> => {
-  /*
-    |--------------------------------------------------------------------------
-    | Verify Seller Profile
-    |--------------------------------------------------------------------------
-    */
-
-  const seller = await getSellerByUserId(userId);
+  const seller = await Seller.findById(sellerId).select("+password");
 
   if (!seller) {
-    throw ApiError.forbidden("Seller profile was not found.", {
-      code: "SELLER_PROFILE_NOT_FOUND",
-    });
+    throw ApiError.notFound("Seller account not found.");
   }
 
-  /*
-    |--------------------------------------------------------------------------
-    | Change User Password
-    |--------------------------------------------------------------------------
-    */
+  const valid = await bcrypt.compare(currentPassword, seller.password);
 
-  await changeUserPassword(userId, currentPassword, newPassword);
+  if (!valid) {
+    throw ApiError.badRequest("Current password is incorrect.");
+  }
 
-  /*
-    |--------------------------------------------------------------------------
-    | Revoke Existing Sessions
-    |--------------------------------------------------------------------------
-    |
-    | Password changes invalidate
-    | previously issued sessions.
-    |
-    */
+  if (currentPassword === newPassword) {
+    throw ApiError.badRequest(
+      "New password must be different from current password.",
+    );
+  }
 
-  await revokeAllUserSessions(userId);
+  seller.password = await bcrypt.hash(newPassword, SALT_ROUNDS);
+  seller.passwordChangedAt = new Date();
+  seller.failedLoginAttempts = 0;
+  seller.lockUntil = undefined;
+
+  await seller.save();
+
+  await revokeAllSellerSessions(sellerId);
 };
 
-/*
-|--------------------------------------------------------------------------
-| Touch Seller Session
-|--------------------------------------------------------------------------
-*/
-
-export const touchSellerSession = async (sessionId: string) => {
-  return touchSession(sessionId);
+export const touchSellerSessionById = async (
+  sellerId: string,
+  sessionId: string,
+) => {
+  return touchSellerSession(sellerId, sessionId);
 };

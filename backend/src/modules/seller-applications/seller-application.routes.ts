@@ -19,6 +19,7 @@ import {
   getSellerApplicationController,
   updateSellerApplicationStatusController,
   deleteSellerApplicationController,
+  resendSellerApplicationInvitationController,
 } from "./seller-application.controller";
 
 import {
@@ -108,6 +109,13 @@ router.delete(
   ...ownerOnly,
   validate(sellerApplicationIdParamSchema, "params"),
   deleteSellerApplicationController,
+);
+
+router.post(
+  "/:applicationId/resend-invitation",
+  ...ownerOnly,
+  validate(sellerApplicationIdParamSchema, "params"),
+  resendSellerApplicationInvitationController,
 );
 
 export default router;

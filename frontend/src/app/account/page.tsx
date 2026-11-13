@@ -118,6 +118,45 @@ export default function AccountPage() {
                     </div>
                 </div>
 
+
+                <section className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-6">
+                    <div className="flex items-start gap-4">
+                        <div className="rounded-full bg-white p-3 text-blue-700">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                            >
+                                <path d="M3 21h18" />
+                                <path d="M5 21V7l8-4v18" />
+                                <path d="M19 21V11l-6-4" />
+                                <path d="M9 9v.01M9 12v.01M9 15v.01M9 18v.01" />
+                            </svg>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <h2 className="text-xl font-semibold">
+                                Become a Seller
+                            </h2>
+                            <p className="mt-2 text-sm text-gray-600">
+                                Apply to sell your products on NOPTRIX and track your application status.
+                            </p>
+                            <Link
+                                href="/seller-application"
+                                className="mt-4 inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
+                            >
+                                Apply to Become a Seller
+                            </Link>
+                        </div>
+                    </div>
+                </section>
+
                 <section className="mt-6 rounded-xl border p-6">
                     <div className="flex items-start gap-4">
                         <div className="rounded-full bg-blue-100 p-3 text-blue-700">

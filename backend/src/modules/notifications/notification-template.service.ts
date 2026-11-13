@@ -72,6 +72,21 @@ const buildTemplateIdentifier = (
   locale: string,
 ): string => `${key}:${channel}:${locale}`;
 
+const buildEventIdentifier = (
+  event: string,
+  channel: NotificationTemplateChannel,
+  locale: string,
+): string => `${event}:${channel}:${locale}`;
+
+const isDuplicateKeyError = (error: unknown): boolean => {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: number }).code === 11000
+  );
+};
+
 /*
 |--------------------------------------------------------------------------
 | Create
@@ -105,20 +120,60 @@ export const createNotificationTemplate = async (
     );
   }
 
-  const template = await NotificationTemplate.create({
-    key,
-    name: input.name.trim(),
-    description: input.description?.trim(),
-    event,
-    channel: input.channel,
-    locale,
-    title: input.title.trim(),
-    body: input.body.trim(),
-    status: input.status ?? NOTIFICATION_TEMPLATE_STATUSES.ACTIVE,
-    variables,
-    createdBy,
-    updatedBy: createdBy,
-  });
+  const status =
+    input.status ?? NOTIFICATION_TEMPLATE_STATUSES.ACTIVE;
+
+  if (status === NOTIFICATION_TEMPLATE_STATUSES.ACTIVE) {
+    const activeDuplicate = await NotificationTemplate.findOne({
+      event,
+      channel: input.channel,
+      locale,
+      status: NOTIFICATION_TEMPLATE_STATUSES.ACTIVE,
+    }).lean();
+
+    if (activeDuplicate) {
+      throw ApiError.conflict(
+        `An ACTIVE notification template already exists for ${buildEventIdentifier(
+          event,
+          input.channel,
+          locale,
+        )}.`,
+        {
+          code: "ACTIVE_NOTIFICATION_TEMPLATE_ALREADY_EXISTS",
+        },
+      );
+    }
+  }
+
+  let template;
+
+  try {
+    template = await NotificationTemplate.create({
+      key,
+      name: input.name.trim(),
+      description: input.description?.trim(),
+      event,
+      channel: input.channel,
+      locale,
+      title: input.title.trim(),
+      body: input.body.trim(),
+      status,
+      variables,
+      createdBy,
+      updatedBy: createdBy,
+    });
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      throw ApiError.conflict(
+        "A conflicting notification template already exists.",
+        {
+          code: "NOTIFICATION_TEMPLATE_DUPLICATE",
+        },
+      );
+    }
+
+    throw error;
+  }
 
   logger.info(
     {
@@ -194,6 +249,54 @@ export const resolveNotificationTemplate = async (
 
     const fallbackTemplate = await NotificationTemplate.findOne({
       key,
+      channel: input.channel,
+      locale: baseLocale,
+      status: NOTIFICATION_TEMPLATE_STATUSES.ACTIVE,
+    });
+
+    if (fallbackTemplate) {
+      return fallbackTemplate;
+    }
+  }
+
+  return null;
+};
+
+/*
+|--------------------------------------------------------------------------
+| Resolve Template By Event
+|--------------------------------------------------------------------------
+*/
+
+export interface ResolveNotificationTemplateByEventInput {
+  readonly event: string;
+  readonly channel: NotificationTemplateChannel;
+  readonly locale?: string;
+}
+
+export const resolveNotificationTemplateByEvent = async (
+  input: ResolveNotificationTemplateByEventInput,
+) => {
+  const event = normalizeEvent(input.event);
+  const locale = normalizeLocale(input.locale ?? "en");
+
+  const template = await NotificationTemplate.findOne({
+    event,
+    channel: input.channel,
+    locale,
+    status: NOTIFICATION_TEMPLATE_STATUSES.ACTIVE,
+  });
+
+  if (template) {
+    return template;
+  }
+
+  // Locale fallback: en-us -> en.
+  if (locale.includes("-")) {
+    const baseLocale = locale.split("-")[0];
+
+    const fallbackTemplate = await NotificationTemplate.findOne({
+      event,
       channel: input.channel,
       locale: baseLocale,
       status: NOTIFICATION_TEMPLATE_STATUSES.ACTIVE,
@@ -362,6 +465,40 @@ export const renderNotificationTemplate = async (
 
 /*
 |--------------------------------------------------------------------------
+| Render Template By Event
+|--------------------------------------------------------------------------
+*/
+
+export interface RenderNotificationTemplateByEventInput {
+  readonly event: string;
+  readonly channel: NotificationTemplateChannel;
+  readonly locale?: string;
+  readonly variables?: Readonly<Record<string, unknown>>;
+}
+
+export const renderNotificationTemplateByEvent = async (
+  input: RenderNotificationTemplateByEventInput,
+): Promise<RenderNotificationTemplateResult | null> => {
+  const template = await resolveNotificationTemplateByEvent({
+    event: input.event,
+    channel: input.channel,
+    locale: input.locale,
+  });
+
+  if (!template) {
+    return null;
+  }
+
+  return renderNotificationTemplate({
+    key: template.key,
+    channel: template.channel,
+    locale: template.locale,
+    variables: input.variables,
+  });
+};
+
+/*
+|--------------------------------------------------------------------------
 | Require Template
 |--------------------------------------------------------------------------
 */
@@ -517,6 +654,32 @@ export const updateNotificationTemplate = async (
 
   const nextLocale = normalizeLocale(input.locale ?? template.locale);
 
+  const nextEvent = normalizeEvent(input.event ?? template.event);
+  const nextStatus = input.status ?? template.status;
+
+  if (nextStatus === NOTIFICATION_TEMPLATE_STATUSES.ACTIVE) {
+    const activeDuplicate = await NotificationTemplate.findOne({
+      _id: { $ne: template._id },
+      event: nextEvent,
+      channel: nextChannel,
+      locale: nextLocale,
+      status: NOTIFICATION_TEMPLATE_STATUSES.ACTIVE,
+    }).lean();
+
+    if (activeDuplicate) {
+      throw ApiError.conflict(
+        `An ACTIVE notification template already exists for ${buildEventIdentifier(
+          nextEvent,
+          nextChannel,
+          nextLocale,
+        )}.`,
+        {
+          code: "ACTIVE_NOTIFICATION_TEMPLATE_ALREADY_EXISTS",
+        },
+      );
+    }
+  }
+
   if (input.channel !== undefined || input.locale !== undefined) {
     const duplicate = await NotificationTemplate.findOne({
       _id: {
@@ -576,7 +739,20 @@ export const updateNotificationTemplate = async (
 
   template.updatedBy = updatedBy;
 
-  await template.save();
+  try {
+    await template.save();
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      throw ApiError.conflict(
+        "A conflicting notification template already exists.",
+        {
+          code: "NOTIFICATION_TEMPLATE_DUPLICATE",
+        },
+      );
+    }
+
+    throw error;
+  }
 
   logger.info(
     {

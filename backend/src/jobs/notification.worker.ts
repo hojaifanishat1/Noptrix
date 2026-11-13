@@ -203,7 +203,9 @@ const toServiceNotification = (
       body: notification.message,
     },
 
-    channels: notification.channels.map(toServiceChannel),
+    channels: notification.channels
+      .filter((channel) => channel !== NOTIFICATION_CHANNELS.IN_APP)
+      .map(toServiceChannel),
 
     metadata: notification.metadata,
 

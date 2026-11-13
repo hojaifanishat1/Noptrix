@@ -84,6 +84,7 @@ export interface SendEmailInput {
   readonly templateLocale?: string;
 
   readonly templateVariables?: Readonly<Record<string, unknown>>;
+  readonly requireTemplate?: boolean;
 }
 
 export interface EmailSendResult {
@@ -436,6 +437,19 @@ export const sendEmail = async (
         .replace(/'/g, "&#039;")
         .replace(/\n/g, "<br />");
     } catch (error) {
+      if (input.requireTemplate) {
+        logger.error(
+          {
+            error,
+            templateKey,
+            templateLocale: input.templateLocale,
+          },
+          "Required email template rendering failed.",
+        );
+
+        throw error;
+      }
+
       logger.warn(
         {
           error,

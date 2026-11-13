@@ -5,7 +5,7 @@ import {
   ownerSecretVerified,
 } from "../../middlewares/ownerAuth.middleware";
 
-import { userAuth } from "../../middlewares/userAuth.middleware";
+import { sellerAuth } from "../../middlewares/sellerAuth.middleware";
 
 import { validate } from "../../middlewares/validation.middleware";
 
@@ -40,7 +40,7 @@ const router = Router();
  *
  * GET /sellers/me
  */
-router.get("/me", userAuth, getMySellerController);
+router.get("/me", sellerAuth, getMySellerController);
 
 /*
 |--------------------------------------------------------------------------

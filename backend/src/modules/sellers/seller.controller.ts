@@ -8,12 +8,11 @@ import { ApiError } from "../../utils/ApiError";
 
 import { getAuthenticatedOwnerId } from "../../middlewares/ownerAuth.middleware";
 
-import { getAuthenticatedUserId } from "../../middlewares/userAuth.middleware";
+import { getAuthenticatedSellerId } from "../../middlewares/sellerAuth.middleware";
 
 import {
   createSeller,
   getSellerById,
-  getSellerByUserId,
   getAllSellers,
   updateSeller,
   updateSellerStatus,
@@ -192,9 +191,9 @@ export const deleteSellerController = asyncHandler(
  */
 export const getMySellerController = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const userId = getAuthenticatedUserId(req);
+    const sellerId = getAuthenticatedSellerId(req);
 
-    const seller = await getSellerByUserId(userId);
+    const seller = await getSellerById(sellerId);
 
     res
       .status(200)

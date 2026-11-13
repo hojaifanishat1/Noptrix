@@ -41,7 +41,7 @@ const urlSchema = z.string().trim().url().max(2000);
 */
 
 export const createSellerSchema = z.object({
-  userId: objectIdSchema,
+  password: z.string().min(8).max(128),
 
   sellerCode: z
     .string()
@@ -159,8 +159,6 @@ export const sellerQuerySchema = z.object({
   type: sellerTypeSchema.optional(),
 
   search: z.string().trim().max(100).optional(),
-
-  userId: objectIdSchema.optional(),
 });
 
 /*
