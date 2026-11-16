@@ -30,6 +30,8 @@ export interface ISeller extends Document {
   website?: string;
 
   status: SellerStatus;
+  onboardingStatus: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
+  onboardingCompletedAt?: Date;
 
   verifiedAt?: Date;
   verifiedBy?: Types.ObjectId;
@@ -132,6 +134,16 @@ const sellerSchema = new Schema<ISeller>(
       default: "PENDING",
       index: true,
     },
+
+    onboardingStatus: {
+      type: String,
+      enum: ["NOT_STARTED", "IN_PROGRESS", "COMPLETED"],
+      default: "NOT_STARTED",
+      required: true,
+      index: true,
+    },
+
+    onboardingCompletedAt: Date,
 
     verifiedAt: Date,
 

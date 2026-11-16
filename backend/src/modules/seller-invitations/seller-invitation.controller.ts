@@ -14,7 +14,7 @@ export const acceptSellerInvitationController = asyncHandler(
     res.status(201).json(
       ApiResponse.created(
         result,
-        "Seller account created. Your account is pending Owner verification.",
+        "Seller account activated. Complete your onboarding to start selling.",
       ).serialize(),
     );
   },
@@ -22,7 +22,11 @@ export const acceptSellerInvitationController = asyncHandler(
 
 export const getSellerInvitationPreviewController = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const result = await getSellerInvitationPreview(req.params.token);
+    const token = Array.isArray(req.params.token)
+      ? req.params.token[0]
+      : req.params.token;
+
+    const result = await getSellerInvitationPreview(token);
 
     res.status(200).json(
       ApiResponse.ok(

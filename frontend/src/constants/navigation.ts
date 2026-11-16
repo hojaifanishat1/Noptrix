@@ -172,6 +172,14 @@ export const RIDER_NAVIGATION: readonly NavigationItem[] = [
         icon: "Truck",
     },
 
+
+    {
+        label: "Verification",
+        href: "/rider-panel/verification",
+        icon: "ShieldCheck",
+    },
+
+
     {
         label: "Orders",
         href: ROUTES.RIDER_ORDERS,

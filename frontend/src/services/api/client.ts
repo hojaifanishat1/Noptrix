@@ -272,6 +272,50 @@ const refreshEmployeeSession =
     };
 
 
+
+/*
+|--------------------------------------------------------------------------
+| Refresh Rider Session
+|--------------------------------------------------------------------------
+*/
+
+const refreshRiderSession =
+    async (): Promise<string | null> => {
+        try {
+            const response =
+                await refreshClient.post<
+                    ApiResponse<{
+                        accessToken: string;
+                        riderId: string;
+                        sessionId: string;
+                    }>
+                >(
+                    "/rider-auth/refresh",
+                    {},
+                );
+
+            const data = response.data.data;
+
+            if (
+                !data ||
+                typeof data.accessToken !== "string" ||
+                !data.accessToken.trim()
+            ) {
+                throw new Error(
+                    "Rider refresh did not return a valid access token.",
+                );
+            }
+
+            tokenStorage.set(data.accessToken);
+
+            return data.accessToken;
+        } catch {
+            clearAuthentication();
+            return null;
+        }
+    };
+
+
 /*
 |--------------------------------------------------------------------------
 | Refresh Owner Session
@@ -380,13 +424,9 @@ const refreshAuthentication =
             case "OWNER":
                 return refreshOwnerSession();
 
-            /*
-             * Customer / Seller / Rider refresh
-             * endpoints are intentionally not assumed here.
-             *
-             * Their existing authentication flow
-             * remains unchanged.
-             */
+            case "RIDER":
+                return refreshRiderSession();
+
             default:
                 return null;
         }
@@ -560,6 +600,9 @@ apiClient.interceptors.response.use(
             ) ||
             requestUrl.includes(
                 "/user-auth/refresh",
+            ) ||
+            requestUrl.includes(
+                "/rider-auth/refresh",
             )
         ) {
             return Promise.reject(
@@ -582,7 +625,8 @@ apiClient.interceptors.response.use(
                 stored.accountType !== "ADMIN" &&
                 stored.accountType !== "EMPLOYEE" &&
                 stored.accountType !== "OWNER" &&
-                stored.accountType !== "USER"
+                stored.accountType !== "USER" &&
+                stored.accountType !== "RIDER"
             )
         ) {
             return Promise.reject(

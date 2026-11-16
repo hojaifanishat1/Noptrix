@@ -64,13 +64,13 @@ export async function createCOD(
   riderUserId: string,
 ) {
   const orderObjectId = objectId(input.orderId);
-  const userObjectId = objectId(riderUserId);
+  const riderObjectId = objectId(riderUserId);
 
   const rider = await Rider.findOne({
-    userId: userObjectId,
+    _id: riderObjectId,
     status: "ACTIVE",
   })
-    .select("_id userId")
+    .select("_id")
     .lean();
 
   if (!rider) {
@@ -104,8 +104,6 @@ export async function createCOD(
       currency,
       status: "PENDING",
       notes: input.notes,
-      createdBy: userObjectId,
-      updatedBy: userObjectId,
     });
   } catch (error) {
     if (
@@ -129,11 +127,11 @@ export async function collectCOD(
   riderUserId: string,
   input: { amount: number; notes?: string },
 ) {
-  const userObjectId = objectId(riderUserId);
+  const riderObjectId = objectId(riderUserId);
   const codObjectId = objectId(codId);
 
   const rider = await Rider.findOne({
-    userId: userObjectId,
+    _id: riderObjectId,
     status: "ACTIVE",
   })
     .select("_id")
@@ -177,7 +175,6 @@ export async function collectCOD(
       $set: {
         status: "COLLECTED",
         collectedAt: new Date(),
-        updatedBy: userObjectId,
         ...(input.notes ? { notes: input.notes } : {}),
       },
     },
@@ -290,9 +287,7 @@ export async function getCODByOrder(orderId: string) {
 }
 
 export async function getMyCODRecords(riderUserId: string, query: CODQuery) {
-  const rider = await Rider.findOne({
-    userId: objectId(riderUserId),
-  })
+  const rider = await Rider.findById(objectId(riderUserId))
     .select("_id")
     .lean();
 

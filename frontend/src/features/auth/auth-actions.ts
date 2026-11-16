@@ -20,6 +20,7 @@ import {
 
 import {
     riderAuthApi,
+    type RiderLoginVerificationChallenge,
 } from "@/services/api/rider-auth.api";
 
 import {
@@ -59,14 +60,9 @@ const saveAuthenticatedUser = (
         .setUser(user);
 
     authStorage.set({
-        accountType:
-            user.accountType,
-
-        userId:
-            user.id,
-
-        role:
-            user.role,
+        accountType: user.accountType,
+        userId: user.id,
+        role: user.role,
     });
 
     return user;
@@ -85,33 +81,18 @@ export const ownerLogin = async (
     const response =
         await ownerAuthApi.login(input);
 
-    tokenStorage.set(
-        response.accessToken,
-    );
+    tokenStorage.set(response.accessToken);
 
     const user: AuthUser = {
-        id:
-            response.userId,
-
-        email:
-            input.email,
-
-        accountType:
-            "OWNER",
-
-        role:
-            "OWNER",
-
-        isVerified:
-            false,
-
-        secretVerified:
-            false,
+        id: response.userId,
+        email: input.email,
+        accountType: "OWNER",
+        role: "OWNER",
+        isVerified: false,
+        secretVerified: false,
     };
 
-    return saveAuthenticatedUser(
-        user,
-    );
+    return saveAuthenticatedUser(user);
 };
 
 
@@ -123,35 +104,19 @@ export const ownerVerifySecret = async (
             secretCode,
         });
 
-    tokenStorage.set(
-        response.accessToken,
-    );
+    tokenStorage.set(response.accessToken);
 
     const user: AuthUser = {
-        id:
-            response.userId,
-
+        id: response.userId,
         email:
-            useAuthStore
-                .getState()
-                .user?.email ?? "",
-
-        accountType:
-            "OWNER",
-
-        role:
-            "OWNER",
-
-        isVerified:
-            true,
-
-        secretVerified:
-            true,
+            useAuthStore.getState().user?.email ?? "",
+        accountType: "OWNER",
+        role: "OWNER",
+        isVerified: true,
+        secretVerified: true,
     };
 
-    return saveAuthenticatedUser(
-        user,
-    );
+    return saveAuthenticatedUser(user);
 };
 
 
@@ -164,7 +129,6 @@ export const ownerVerifySecret = async (
 export const adminLogin = async (
     input: LoginInput,
 ): Promise<AuthUser | LoginVerificationChallenge> => {
-
     const response =
         await adminAuthApi.login(input);
 
@@ -175,31 +139,40 @@ export const adminLogin = async (
     return saveStaffLogin(response);
 };
 
+
 export const adminVerifyLogin = async (
     input: LoginVerificationInput,
 ): Promise<AuthUser> => {
-    const response = await adminAuthApi.verifyLogin(input);
+    const response =
+        await adminAuthApi.verifyLogin(input);
 
     return saveStaffLogin(response);
 };
 
+
 export const adminResendLoginCode = async (
     challengeId: string,
 ): Promise<LoginVerificationChallenge> => {
-    const response = await adminAuthApi.resendLoginCode(challengeId);
+    const response =
+        await adminAuthApi.resendLoginCode(challengeId);
 
     if (!("verificationRequired" in response)) {
-        throw new Error("Login verification challenge was not returned.");
+        throw new Error(
+            "Login verification challenge was not returned.",
+        );
     }
 
     return response;
 };
 
+
 const saveStaffLogin = (
     response: LoginAttemptResponse,
 ): AuthUser => {
     if ("verificationRequired" in response) {
-        throw new Error("Login verification was not completed.");
+        throw new Error(
+            "Login verification was not completed.",
+        );
     }
 
     const accessToken =
@@ -207,15 +180,12 @@ const saveStaffLogin = (
         response.accessToken;
 
     if (accessToken) {
-        tokenStorage.set(
-            accessToken,
-        );
+        tokenStorage.set(accessToken);
     }
 
-    return saveAuthenticatedUser(
-        response.user,
-    );
+    return saveAuthenticatedUser(response.user);
 };
+
 
 export const employeeLogin = async (
     input: LoginInput,
@@ -230,25 +200,32 @@ export const employeeLogin = async (
     return saveStaffLogin(response);
 };
 
+
 export const employeeVerifyLogin = async (
     input: LoginVerificationInput,
 ): Promise<AuthUser> => {
-    const response = await employeeAuthApi.verifyLogin(input);
+    const response =
+        await employeeAuthApi.verifyLogin(input);
 
     return saveStaffLogin(response);
 };
 
+
 export const employeeResendLoginCode = async (
     challengeId: string,
 ): Promise<LoginVerificationChallenge> => {
-    const response = await employeeAuthApi.resendLoginCode(challengeId);
+    const response =
+        await employeeAuthApi.resendLoginCode(challengeId);
 
     if (!("verificationRequired" in response)) {
-        throw new Error("Login verification challenge was not returned.");
+        throw new Error(
+            "Login verification challenge was not returned.",
+        );
     }
 
     return response;
 };
+
 
 /*
 |--------------------------------------------------------------------------
@@ -263,40 +240,52 @@ export const customerLogin = async (
         await customerAuthApi.login(input);
 
     if (response.accessToken) {
-        tokenStorage.set(
-            response.accessToken,
-        );
+        tokenStorage.set(response.accessToken);
     }
 
-    return saveAuthenticatedUser(
-        response.user,
-    );
+    return saveAuthenticatedUser(response.user);
 };
 
 
-export const customerRegister =
-    async (
-        input: RegisterInput,
-    ): Promise<RegistrationResponse> => {
-        return customerAuthApi.register(input);
-    };
+export const customerRegister = async (
+    input: RegisterInput,
+): Promise<RegistrationResponse> => {
+    return customerAuthApi.register(input);
+};
 
 
 /*
 |--------------------------------------------------------------------------
 | Rider
 |--------------------------------------------------------------------------
+|
+| Login only creates an OTP challenge.
+| No access token or authenticated state is created here.
+|
 */
 
 export const riderLogin = async (
-    input: LoginInput,
+    input: { email?: string; phone?: string; password: string },
+): Promise<RiderLoginVerificationChallenge> => {
+    tokenStorage.clear();
+
+    return riderAuthApi.login(input);
+};
+
+
+export const riderVerifyLogin = async (
+    input: LoginVerificationInput,
 ): Promise<AuthUser> => {
     const response =
-        await riderAuthApi.login(input);
+        await riderAuthApi.verifyLogin(input);
 
-    tokenStorage.set(
-        response.accessToken,
-    );
+    if (!response.accessToken) {
+        throw new Error(
+            "Rider verification did not return an access token.",
+        );
+    }
+
+    tokenStorage.set(response.accessToken);
 
     try {
         const profile =
@@ -304,43 +293,27 @@ export const riderLogin = async (
 
         return saveAuthenticatedUser({
             ...profile,
-            id: response.userId,
+            id: response.riderId,
             accountType: "RIDER",
             role: "RIDER",
         });
     } catch (error) {
         tokenStorage.clear();
-        await riderAuthApi.logout(response.sessionId);
+
+        try {
+            await riderAuthApi.logout();
+        } catch {
+            // Keep the original profile error.
+        }
+
         throw error;
     }
 };
 
-export const riderVerifyLogin = async (
-    input: LoginVerificationInput,
-): Promise<AuthUser> => {
-    const response = await riderAuthApi.verifyLogin(input);
-
-    tokenStorage.set(response.accessToken);
-
-    try {
-        const profile = await riderAuthApi.getMe();
-
-        return saveAuthenticatedUser({
-            ...profile,
-            id: response.userId,
-            accountType: "RIDER",
-            role: "RIDER",
-        });
-    } catch (error) {
-        tokenStorage.clear();
-        await riderAuthApi.logout(response.sessionId);
-        throw error;
-    }
-};
 
 export const riderResendLoginCode = async (
     challengeId: string,
-) => {
+): Promise<RiderLoginVerificationChallenge> => {
     return riderAuthApi.resendLoginCode(challengeId);
 };
 
@@ -354,8 +327,7 @@ export const riderResendLoginCode = async (
 export const restoreAuthSession =
     async (): Promise<AuthUser> => {
 
-        const stored =
-            authStorage.get();
+        const stored = authStorage.get();
 
         if (!stored) {
             throw new Error(
@@ -365,9 +337,7 @@ export const restoreAuthSession =
 
         let user: AuthUser;
 
-        switch (
-            stored.accountType
-        ) {
+        switch (stored.accountType) {
             case "EMPLOYEE": {
                 const response =
                     await employeeAuthApi.refresh();
@@ -381,25 +351,33 @@ export const restoreAuthSession =
                 const response =
                     await adminAuthApi.refresh();
 
-                tokenStorage.set(
-                    response.accessToken,
-                );
-
-                user =
-                    response.user;
-
+                tokenStorage.set(response.accessToken);
+                user = response.user;
                 break;
             }
 
             case "USER":
-                user =
-                    await customerAuthApi.getMe();
+                user = await customerAuthApi.getMe();
                 break;
 
-            case "RIDER":
-                user =
+            case "RIDER": {
+                const response =
+                    await riderAuthApi.refresh();
+
+                tokenStorage.set(response.accessToken);
+
+                const profile =
                     await riderAuthApi.getMe();
+
+                user = {
+                    ...profile,
+                    id: response.riderId,
+                    accountType: "RIDER",
+                    role: "RIDER",
+                };
+
                 break;
+            }
 
             case "OWNER":
                 throw new Error(
@@ -412,9 +390,7 @@ export const restoreAuthSession =
                 );
         }
 
-        return saveAuthenticatedUser(
-            user,
-        );
+        return saveAuthenticatedUser(user);
     };
 
 
@@ -427,13 +403,9 @@ export const restoreAuthSession =
 export const logout = async (): Promise<void> => {
     try {
         const user =
-            useAuthStore
-                .getState()
-                .user;
+            useAuthStore.getState().user;
 
-        switch (
-            user?.accountType
-        ) {
+        switch (user?.accountType) {
             case "OWNER":
                 await ownerAuthApi.logout();
                 break;
@@ -448,9 +420,7 @@ export const logout = async (): Promise<void> => {
 
             case "USER":
                 if (user.id) {
-                    await customerAuthApi.logout(
-                        user.id,
-                    );
+                    await customerAuthApi.logout(user.id);
                 }
                 break;
 
@@ -464,11 +434,7 @@ export const logout = async (): Promise<void> => {
         }
     } finally {
         tokenStorage.clear();
-
         authStorage.clear();
-
-        useAuthStore
-            .getState()
-            .clearAuth();
+        useAuthStore.getState().clearAuth();
     }
 };

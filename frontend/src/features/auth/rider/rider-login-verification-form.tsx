@@ -20,8 +20,8 @@ const RIDER_CHALLENGE_STORAGE_KEY =
 interface RiderLoginVerificationChallenge {
     verificationRequired: true;
     challengeId: string;
-    email: string;
-    phone: string;
+        email?: string;
+    phone?: string;
     expiresAt: string;
     resendAvailableAt: string;
 }
@@ -48,8 +48,9 @@ const parseChallenge = (
         if (
             parsed.verificationRequired === true &&
             typeof parsed.challengeId === "string" &&
-            typeof parsed.email === "string" &&
-            typeof parsed.phone === "string" &&
+                        (parsed.email === undefined || typeof parsed.email === "string") &&
+            (parsed.phone === undefined || typeof parsed.phone === "string") &&
+            Boolean(parsed.email || parsed.phone) &&
             typeof parsed.expiresAt === "string" &&
             typeof parsed.resendAvailableAt === "string"
         ) {
@@ -183,7 +184,7 @@ export default function RiderLoginVerificationForm() {
                 RIDER_CHALLENGE_STORAGE_KEY,
             );
 
-            window.location.replace("/rider/dashboard");
+            window.location.replace("/rider-panel");
         } catch (verificationError: unknown) {
             setError(getErrorMessage(verificationError));
         } finally {
@@ -347,11 +348,11 @@ export default function RiderLoginVerificationForm() {
 
                             <div>
                                 <h2 className="font-bold text-slate-900">
-                                    Dual-channel protection
+                                                                        Flexible contact verification
                                 </h2>
                                 <p className="mt-1 text-sm leading-6 text-slate-500">
-                                    Your sign-in code is delivered to both
-                                    your registered email and phone.
+                                                                        Your sign-in code is delivered to the
+                                    available contact method(s) on your account.
                                 </p>
                             </div>
                         </div>
@@ -422,13 +423,14 @@ export default function RiderLoginVerificationForm() {
                                 </h2>
 
                                 <p className="mt-3 text-sm leading-6 text-slate-500">
-                                    Enter the six-digit code sent to both
-                                    your registered email and phone.
+                                                                        Enter the six-digit code sent to your
+                                    registered contact method(s).
                                 </p>
                             </div>
 
                             {/* Email */}
-                            <div className="mt-7 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                            {challenge.email && (
+<div className="mt-7 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-500 shadow-sm ring-1 ring-slate-200">
                                     <svg
                                         viewBox="0 0 24 24"
@@ -451,9 +453,11 @@ export default function RiderLoginVerificationForm() {
                                     </p>
                                 </div>
                             </div>
+            )}
 
                             {/* Phone */}
-                            <div className="mt-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                            {challenge.phone && (
+<div className="mt-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-500 shadow-sm ring-1 ring-slate-200">
                                     <svg
                                         viewBox="0 0 24 24"
@@ -476,6 +480,7 @@ export default function RiderLoginVerificationForm() {
                                     </p>
                                 </div>
                             </div>
+            )}
 
                             {/* OTP form */}
                             <form
@@ -523,8 +528,8 @@ export default function RiderLoginVerificationForm() {
                                     />
 
                                     <p className="mt-3 text-xs leading-5 text-slate-400">
-                                        Check your email inbox and SMS messages.
-                                        Use the same code from either channel.
+                                                                                Check your registered email or phone.
+                                        Use the code delivered to either available channel.
                                     </p>
                                 </div>
 

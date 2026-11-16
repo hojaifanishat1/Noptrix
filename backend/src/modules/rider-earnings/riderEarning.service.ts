@@ -555,27 +555,16 @@ export const getRiderEarningSummary = async (
 |--------------------------------------------------------------------------
 */
 
-export const requireRiderEarningForUser = async (
+export const requireRiderEarningForRider = async (
   earningId: string,
-  userId: string,
+  riderId: string,
 ): Promise<RiderEarningData> => {
   const earningObjectId = ensureObjectId(earningId, "earning ID");
-
-  const userObjectId = ensureObjectId(userId, "user ID");
-
-  const rider = await Rider.findOne({
-    userId: userObjectId,
-  })
-    .select("_id")
-    .lean();
-
-  if (!rider) {
-    throw ApiError.notFound("Rider profile not found.");
-  }
+  const riderObjectId = ensureObjectId(riderId, "rider ID");
 
   const earning = await RiderEarning.findOne({
     _id: earningObjectId,
-    riderId: rider._id,
+    riderId: riderObjectId,
   }).lean();
 
   if (!earning) {

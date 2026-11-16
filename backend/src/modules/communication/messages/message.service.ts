@@ -164,8 +164,13 @@ const addMessageNames = async (
         .select("_id businessName")
         .lean()
         .exec(),
-      Rider.find({ userId: { $in: userIds } })
-        .select("userId")
+      Rider.find({
+        $or: [
+          { userId: { $in: userIds } },
+          { _id: { $in: messageObjectIds } },
+        ],
+      })
+        .select("_id userId name")
         .lean()
         .exec(),
     ],
@@ -203,7 +208,14 @@ const addMessageNames = async (
     );
   });
   sellers.forEach((seller) => assignRole(seller._id, "Seller"));
-  riders.forEach((rider) => assignRole(rider.userId, "Rider"));
+  riders.forEach((rider) => {
+    names.set(rider._id.toString(), rider.name);
+    assignRole(rider._id, "Rider");
+
+    if (rider.userId) {
+      assignRole(rider.userId, "Rider");
+    }
+  });
   const resolveUserId = (id: string): string => legacyUserIds.get(id) ?? id;
   const resolveName = (id: string): string =>
     names.get(resolveUserId(id)) ?? "Unknown user";
@@ -621,12 +633,22 @@ export const getMessageRecipients = async (
     });
   }
   for (const rider of riders) {
-    const userId = rider.userId.toString();
-    accountTypes.set(userId, "RIDER");
-    profiles.set(userId, {
+    const riderId = rider._id.toString();
+
+    accountTypes.set(riderId, "RIDER");
+    profiles.set(riderId, {
       profileName: rider.name,
       email: rider.email,
     });
+
+    if (rider.userId) {
+      const legacyUserId = rider.userId.toString();
+      accountTypes.set(legacyUserId, "RIDER");
+      profiles.set(legacyUserId, {
+        profileName: rider.name,
+        email: rider.email,
+      });
+    }
   }
 
   accountTypes.delete(senderObjectId.toString());

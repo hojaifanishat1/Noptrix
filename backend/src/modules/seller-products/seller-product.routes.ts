@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { sellerAuth } from "../../middlewares/sellerAuth.middleware";
+import { requireSellerOnboardingCompleted } from "../onboarding/require-seller-onboarding.middleware";
 import { ownerOrAdminAuth } from "../../middlewares/ownerOrAdminAuth.middleware";
 import {
   validate,
@@ -47,6 +48,7 @@ router.patch(
 
 /* All remaining endpoints require seller authentication. */
 router.use(sellerAuth);
+router.use(requireSellerOnboardingCompleted);
 
 router.get(
   "/",

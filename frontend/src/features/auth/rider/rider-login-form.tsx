@@ -3,6 +3,7 @@
 import { type FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+
 import {
     ArrowRight,
     Eye,
@@ -17,10 +18,13 @@ import {
 
 import { riderLogin } from "@/features/auth/auth-actions";
 
+const CHALLENGE_STORAGE_KEY =
+    "noptrix:rider-login-challenge";
+
 export default function RiderLoginForm() {
     const router = useRouter();
 
-    const [email, setEmail] = useState("");
+        const [identifier, setIdentifier] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -30,22 +34,37 @@ export default function RiderLoginForm() {
         event: FormEvent<HTMLFormElement>,
     ) {
         event.preventDefault();
+
         setError("");
         setLoading(true);
 
         try {
-            const user = await riderLogin({
-                email: email.trim(),
-                password,
-            });
+                        const value = identifier.trim();
 
-            if (user.accountType !== "RIDER") {
+            if (!value) {
                 throw new Error(
-                    "This account is not authorized to access the Rider Portal.",
+                    "Enter your registered email address or phone number.",
                 );
             }
 
-            router.replace("/rider-panel");
+            const loginInput = value.includes("@")
+                ? { email: value.toLowerCase(), password }
+                : { phone: value, password };
+
+            const challenge = await riderLogin(loginInput);
+
+            if (!challenge.verificationRequired) {
+                throw new Error(
+                    "Rider login verification was not requested.",
+                );
+            }
+
+            sessionStorage.setItem(
+                CHALLENGE_STORAGE_KEY,
+                JSON.stringify(challenge),
+            );
+
+            router.push("/rider/verify-otp");
         } catch (loginError: unknown) {
             setError(
                 loginError instanceof Error
@@ -63,6 +82,7 @@ export default function RiderLoginForm() {
                 aria-hidden="true"
                 className="pointer-events-none absolute -left-40 -top-40 h-96 w-96 rounded-full bg-cyan-500/15 blur-3xl"
             />
+
             <div
                 aria-hidden="true"
                 className="pointer-events-none absolute -bottom-40 -right-32 h-96 w-96 rounded-full bg-blue-600/20 blur-3xl"
@@ -76,10 +96,12 @@ export default function RiderLoginForm() {
                     <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20">
                         <Truck className="h-6 w-6" />
                     </span>
+
                     <span>
                         <span className="block text-xl font-black tracking-[0.16em]">
                             NOPTRIX
                         </span>
+
                         <span className="block text-xs font-medium tracking-wider text-slate-400">
                             RIDER PORTAL
                         </span>
@@ -94,9 +116,11 @@ export default function RiderLoginForm() {
                     <h1 className="mt-7 text-3xl font-extrabold tracking-tight">
                         Rider sign in
                     </h1>
+
                     <p className="mt-3 text-sm leading-6 text-slate-400">
-                        Sign in with the account provided in your
-                        NOPTRIX rider invitation.
+                                                Sign in with the email address or phone number
+                        linked to your NOPTRIX rider account. We will send
+                        a verification code to your available contact method(s).
                     </p>
 
                     {error && (
@@ -115,28 +139,33 @@ export default function RiderLoginForm() {
                     >
                         <div>
                             <label
-                                htmlFor="rider-email"
+                                                                htmlFor="rider-identifier"
                                 className="mb-2 block text-sm font-semibold text-slate-200"
                             >
-                                Email address
+                                                                Email or phone number
+
                             </label>
+
                             <div className="relative">
                                 <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+
                                 <input
-                                    id="rider-email"
-                                    name="email"
-                                    type="email"
+                                                                        id="rider-identifier"
+                                    name="identifier"
+                                    type="text"
+                                    inputMode="text"
                                     autoComplete="username"
                                     autoCapitalize="none"
+                                    autoCorrect="off"
                                     spellCheck={false}
                                     required
                                     disabled={loading}
-                                    value={email}
+                                                                        value={identifier}
                                     onChange={(event) => {
-                                        setEmail(event.target.value);
+                                        setIdentifier(event.target.value);
                                         setError("");
                                     }}
-                                    placeholder="rider@example.com"
+                                                                        placeholder="Email address or +9665XXXXXXXX"
                                     className="w-full rounded-xl border border-white/10 bg-slate-900/80 py-3.5 pl-12 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 disabled:opacity-60"
                                 />
                             </div>
@@ -149,8 +178,10 @@ export default function RiderLoginForm() {
                             >
                                 Password
                             </label>
+
                             <div className="relative">
                                 <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+
                                 <input
                                     id="rider-password"
                                     name="password"
@@ -166,6 +197,7 @@ export default function RiderLoginForm() {
                                     placeholder="Enter your password"
                                     className="w-full rounded-xl border border-white/10 bg-slate-900/80 py-3.5 pl-12 pr-12 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 disabled:opacity-60"
                                 />
+
                                 <button
                                     type="button"
                                     aria-label={
@@ -204,11 +236,11 @@ export default function RiderLoginForm() {
                             {loading ? (
                                 <>
                                     <LoaderCircle className="h-5 w-5 animate-spin" />
-                                    Signing in...
+                                    Sending verification code...
                                 </>
                             ) : (
                                 <>
-                                    Sign in to Rider Portal
+                                    Continue
                                     <ArrowRight className="h-4 w-4" />
                                 </>
                             )}

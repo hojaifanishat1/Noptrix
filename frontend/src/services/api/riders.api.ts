@@ -61,6 +61,17 @@ export interface ConvertSelectedApplicationToRiderInput {
   notes?: string;
 }
 
+export interface RiderInvitationResult {
+  invitationId: string;
+  name: string;
+  email: string;
+  status: "PENDING";
+  expiresAt: string;
+  applicationId: string;
+  riderCode: string;
+  message: string;
+}
+
 export interface RiderListResult {
   riders: Rider[];
   pagination: RiderPagination;
@@ -86,8 +97,8 @@ export const ridersApi = {
   async convertApplication(
     applicationId: string,
     input: ConvertSelectedApplicationToRiderInput,
-  ): Promise<Rider> {
-    const response = await apiClient.post<ApiResponse<Rider>>(
+  ): Promise<RiderInvitationResult> {
+    const response = await apiClient.post<ApiResponse<RiderInvitationResult>>(
       `/riders/applications/${applicationId}/convert`,
       input,
     );

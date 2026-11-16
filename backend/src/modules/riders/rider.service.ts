@@ -603,6 +603,12 @@ export const updateMyRiderAvailability = async (
     );
   }
 
+  if (isAvailable && rider.onboardingStatus !== "COMPLETED") {
+    throw ApiError.badRequest(
+      "Complete your rider onboarding before becoming available.",
+    );
+  }
+
   if (isAvailable) {
     const hasCoordinates =
       rider.currentLatitude != null &&

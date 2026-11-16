@@ -1,14 +1,18 @@
-import { Request, Response, NextFunction, RequestHandler } from "express";
-import { Types } from "mongoose";
-import { verifyAccessToken, type AccessTokenPayload } from "../utils/token";
-import { Rider } from "../modules/riders/rider.model";
-import { User } from "../modules/users/user.model";
+import {
+  Request,
+  Response,
+  NextFunction,
+  RequestHandler,
+} from "express";
 
-/*
-|--------------------------------------------------------------------------
-| Rider Auth Context
-|--------------------------------------------------------------------------
-*/
+import { Types } from "mongoose";
+
+import {
+  verifyAccessToken,
+  type AccessTokenPayload,
+} from "../utils/token";
+
+import { Rider } from "../modules/riders/rider.model";
 
 export interface RiderAuthContext {
   readonly riderId: string;
@@ -26,7 +30,9 @@ declare global {
   }
 }
 
-const extractBearerToken = (authorizationHeader?: string): string | null => {
+const extractBearerToken = (
+  authorizationHeader?: string,
+): string | null => {
   if (typeof authorizationHeader !== "string") return null;
 
   const parts = authorizationHeader.trim().split(/\s+/);
@@ -41,27 +47,23 @@ const extractBearerToken = (authorizationHeader?: string): string | null => {
 const buildRiderAuthContext = (
   payload: AccessTokenPayload,
 ): RiderAuthContext => {
-  const { sub, iat, exp, ...additionalClaims } = payload;
+  const {
+    sub,
+    iat,
+    exp,
+    ...additionalClaims
+  } = payload;
+
   const claims = additionalClaims as Record<string, unknown>;
-  const role = typeof claims.role === "string" ? claims.role : undefined;
 
   return Object.freeze({
     riderId: sub,
-    ...(role ? { role } : {}),
+    ...(typeof claims.role === "string" ? { role: claims.role } : {}),
     ...(typeof iat === "number" ? { tokenIssuedAt: iat } : {}),
     ...(typeof exp === "number" ? { tokenExpiresAt: exp } : {}),
     claims: Object.freeze({ ...claims }),
   });
 };
-
-/*
-|--------------------------------------------------------------------------
-| Rider Authentication
-|--------------------------------------------------------------------------
-| Token sub is the Rider document ID, not the User ID.
-| Database status is checked on every protected rider request.
-|--------------------------------------------------------------------------
-*/
 
 export const riderAuth: RequestHandler = async (
   req: Request,
@@ -90,23 +92,9 @@ export const riderAuth: RequestHandler = async (
     return;
   }
 
-  if (payload.tokenType !== "access") {
-    res.status(401).json({
-      success: false,
-      message: "Invalid rider authentication token.",
-    });
-    return;
-  }
-
-  if (payload.role !== "RIDER") {
-    res.status(403).json({
-      success: false,
-      message: "Rider access required.",
-    });
-    return;
-  }
-
   if (
+    payload.tokenType !== "access" ||
+    payload.role !== "RIDER" ||
     typeof payload.sub !== "string" ||
     !Types.ObjectId.isValid(payload.sub)
   ) {
@@ -119,7 +107,7 @@ export const riderAuth: RequestHandler = async (
 
   try {
     const rider = await Rider.findById(payload.sub)
-      .select("userId status")
+      .select("_id status")
       .lean()
       .exec();
 
@@ -140,20 +128,6 @@ export const riderAuth: RequestHandler = async (
       return;
     }
 
-    const user = await User.findById(rider.userId)
-      .select("status")
-      .lean()
-      .exec();
-
-    if (!user || user.status !== "ACTIVE") {
-      res.status(403).json({
-        success: false,
-        message: "Rider user account is unavailable.",
-        code: "RIDER_USER_ACCOUNT_INACTIVE",
-      });
-      return;
-    }
-
     req.riderAuth = buildRiderAuthContext(payload);
     next();
   } catch (error) {
@@ -169,6 +143,7 @@ export const requireRider: RequestHandler = (req, res, next) => {
     });
     return;
   }
+
   next();
 };
 

@@ -9,7 +9,6 @@ import {
 import { Admin } from "../admins/admin.model";
 import {
   acceptRiderInvitation,
-  createRiderInvitation,
   getRiderInvitationByToken,
   listRiderInvitations,
   revokeRiderInvitation,
@@ -32,21 +31,6 @@ const getParam = (value: string | string[] | undefined, fieldName: string) => {
   }
   return value.trim();
 };
-
-export const createRiderInvitationController = asyncHandler(
-  async (req: Request, res: Response) => {
-    const invitedBy = await getActorUserId(req);
-    const invitation = await createRiderInvitation(invitedBy, req.body);
-    res
-      .status(201)
-      .json(
-        ApiResponse.created(
-          invitation,
-          "Rider invitation sent successfully.",
-        ).serialize(),
-      );
-  },
-);
 
 export const getRiderInvitationByTokenController = asyncHandler(
   async (req: Request, res: Response) => {

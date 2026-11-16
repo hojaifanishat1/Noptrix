@@ -1,145 +1,291 @@
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 
 import { asyncHandler } from "../../utils/asyncHandler";
-
 import { ApiError } from "../../utils/ApiError";
+import { env } from "../../config/env";
 
-import { getAuthenticatedRiderId } from "../../middlewares/riderAuth.middleware";
+import { Rider } from "../riders/rider.model";
 
-import { getRiderById } from "../riders/rider.service";
-
-import { User } from "../users/user.model";
+import {
+  getAuthenticatedRiderId,
+} from "../../middlewares/riderAuth.middleware";
 
 import {
   loginRider,
+  verifyRiderLoginChallenge,
+  resendRiderLoginChallenge,
   refreshRiderToken,
   logoutRider,
+  changeRiderPassword,
 } from "./rider-auth.service";
 
-/*
-|--------------------------------------------------------------------------
-| Rider Login
-|--------------------------------------------------------------------------
-*/
+import {
+  getTokenExpiration,
+} from "../../utils/token";
 
-export const login = asyncHandler(async (req: Request, res: Response) => {
-  const { email, phone, password } = req.body;
+const RIDER_REFRESH_COOKIE = "noptrix_rider_rt";
+const RIDER_REFRESH_COOKIE_PATH = "/api/rider-auth";
 
-  /*
-            |--------------------------------------------------------------------------
-            | Validate Login Fields
-            |--------------------------------------------------------------------------
-            */
+const getRiderCookieOptions = () => ({
+  httpOnly: true,
+  secure: env.COOKIE_SECURE,
+  sameSite: "strict" as const,
+  path: RIDER_REFRESH_COOKIE_PATH,
+  ...(env.COOKIE_DOMAIN
+    ? { domain: env.COOKIE_DOMAIN }
+    : {}),
+});
 
-  if (typeof password !== "string") {
-    throw ApiError.badRequest("Password is required.", {
-      code: "PASSWORD_REQUIRED",
-    });
+const setRiderRefreshCookie = (
+  res: Response,
+  refreshToken: string,
+): void => {
+  const expiration = getTokenExpiration(refreshToken);
+
+  if (!expiration || expiration <= Date.now()) {
+    throw ApiError.internal(
+      "Could not determine Rider refresh-token expiry.",
+    );
   }
 
-  if (typeof email !== "string" && typeof phone !== "string") {
-    throw ApiError.badRequest("Email or phone is required.", {
-      code: "LOGIN_IDENTIFIER_REQUIRED",
-    });
-  }
-
-  /*
-            |--------------------------------------------------------------------------
-            | Login
-            |--------------------------------------------------------------------------
-            */
-
-  const result = await loginRider(
+  res.cookie(
+    RIDER_REFRESH_COOKIE,
+    refreshToken,
     {
-      email: typeof email === "string" ? email : undefined,
-
-      phone: typeof phone === "string" ? phone : undefined,
-
-      password,
-    },
-    {
-      userAgent: req.get("user-agent"),
-
-      ipAddress: req.ip,
+      ...getRiderCookieOptions(),
+      expires: new Date(expiration),
+      maxAge: expiration - Date.now(),
     },
   );
+};
 
-  /*
-            |--------------------------------------------------------------------------
-            | Response
-            |--------------------------------------------------------------------------
-            */
+const clearRiderRefreshCookie = (
+  res: Response,
+): void => {
+  res.clearCookie(
+    RIDER_REFRESH_COOKIE,
+    getRiderCookieOptions(),
+  );
+};
 
-  res.status(200).json({
-    success: true,
+const getRiderRefreshCookie = (
+  req: Request,
+): string | undefined => {
+  const value = req.cookies?.[RIDER_REFRESH_COOKIE];
 
-    message: "Rider login successful.",
+  return typeof value === "string" && value.trim()
+    ? value
+    : undefined;
+};
 
-    data: {
-      riderId: result.riderId,
-
-      userId: result.userId,
-
-      accessToken: result.accessToken,
-
-      refreshToken: result.refreshToken,
-
-      sessionId: result.sessionId,
-    },
-  });
+const safeSessionResponse = (result: {
+  accessToken: string;
+  riderId: { toString(): string };
+  sessionId: { toString(): string };
+}) => ({
+  accessToken: result.accessToken,
+  riderId: result.riderId.toString(),
+  sessionId: result.sessionId.toString(),
 });
 
 /*
 |--------------------------------------------------------------------------
-| Refresh Rider Access Token
+| Login
+|--------------------------------------------------------------------------
+*/
+
+export const login = asyncHandler(
+  async (req: Request, res: Response) => {
+    const {
+      email,
+      phone,
+      password,
+    } = req.body;
+
+    if (typeof password !== "string") {
+      throw ApiError.badRequest(
+        "Password is required.",
+      );
+    }
+
+    const result = await loginRider({
+      email:
+        typeof email === "string"
+          ? email
+          : undefined,
+
+      phone:
+        typeof phone === "string"
+          ? phone
+          : undefined,
+
+      password,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Rider login verification code sent.",
+      data: result,
+    });
+  },
+);
+
+/*
+|--------------------------------------------------------------------------
+| Verify Login OTP
+|--------------------------------------------------------------------------
+*/
+
+export const verifyLogin = asyncHandler(
+  async (req: Request, res: Response) => {
+    const {
+      challengeId,
+      code,
+    } = req.body;
+
+    const result = await verifyRiderLoginChallenge(
+      challengeId,
+      code,
+    );
+
+    setRiderRefreshCookie(
+      res,
+      result.refreshToken,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Rider login successful.",
+      data: safeSessionResponse(result),
+    });
+  },
+);
+
+/*
+|--------------------------------------------------------------------------
+| Resend Login OTP
+|--------------------------------------------------------------------------
+*/
+
+export const resendLoginCode = asyncHandler(
+  async (req: Request, res: Response) => {
+    const {
+      challengeId,
+    } = req.body;
+
+    const result = await resendRiderLoginChallenge(
+      challengeId,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Rider login verification code resent.",
+      data: result,
+    });
+  },
+);
+
+/*
+|--------------------------------------------------------------------------
+| Refresh
 |--------------------------------------------------------------------------
 */
 
 export const refreshToken = asyncHandler(
   async (req: Request, res: Response) => {
-    const { refreshToken } = req.body;
+    const refreshToken = getRiderRefreshCookie(req);
 
-    /*
-            |--------------------------------------------------------------------------
-            | Validate Refresh Token
-            |--------------------------------------------------------------------------
-            */
-
-    if (typeof refreshToken !== "string") {
-      throw ApiError.badRequest("Refresh token is required.", {
-        code: "REFRESH_TOKEN_REQUIRED",
-      });
+    if (!refreshToken) {
+      throw ApiError.unauthorized(
+        "Rider refresh session is missing.",
+        {
+          code: "MISSING_REFRESH_TOKEN",
+        },
+      );
     }
 
-    /*
-            |--------------------------------------------------------------------------
-            | Refresh Token
-            |--------------------------------------------------------------------------
-            */
+    const result = await refreshRiderToken(
+      refreshToken,
+    );
 
-    const result = await refreshRiderToken(refreshToken);
-
-    /*
-            |--------------------------------------------------------------------------
-            | Response
-            |--------------------------------------------------------------------------
-            */
+    setRiderRefreshCookie(
+      res,
+      result.refreshToken,
+    );
 
     res.status(200).json({
       success: true,
-
       message: "Rider access token refreshed successfully.",
+      data: safeSessionResponse(result),
+    });
+  },
+);
 
+/*
+|--------------------------------------------------------------------------
+| Logout
+|--------------------------------------------------------------------------
+*/
+
+export const logout = asyncHandler(
+  async (req: Request, res: Response) => {
+    const riderId = getAuthenticatedRiderId(req);
+    const refreshToken = getRiderRefreshCookie(req);
+
+    await logoutRider(
+      riderId,
+      refreshToken,
+    );
+
+    clearRiderRefreshCookie(res);
+
+    res.status(200).json({
+      success: true,
+      message: "Rider logout successful.",
+    });
+  },
+);
+
+/*
+|--------------------------------------------------------------------------
+| Current Rider
+|--------------------------------------------------------------------------
+*/
+
+export const getMe = asyncHandler(
+  async (req: Request, res: Response) => {
+    const riderId = getAuthenticatedRiderId(req);
+
+    const rider = await Rider.findById(riderId);
+
+    if (!rider) {
+      throw ApiError.notFound(
+        "Rider profile was not found.",
+      );
+    }
+
+    if (rider.status !== "ACTIVE") {
+      throw ApiError.forbidden(
+        "Rider account is not active.",
+      );
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Rider profile retrieved successfully.",
       data: {
-        riderId: result.riderId,
-
-        userId: result.userId,
-
-        accessToken: result.accessToken,
-
-        refreshToken: result.refreshToken,
-
-        sessionId: result.sessionId,
+        id: rider._id.toString(),
+        riderId: rider._id.toString(),
+        name: rider.name,
+        email: rider.email,
+        phone: rider.phone,
+        accountType: "RIDER",
+        role: "RIDER",
+        riderCode: rider.riderCode,
+        riderStatus: rider.status,
+        onboardingStatus: rider.onboardingStatus,
+        vehicleType: rider.vehicleType,
+        vehicleNumber: rider.vehicleNumber,
       },
     });
   },
@@ -147,111 +293,31 @@ export const refreshToken = asyncHandler(
 
 /*
 |--------------------------------------------------------------------------
-| Rider Logout
+| Change Password
 |--------------------------------------------------------------------------
 */
 
-export const logout = asyncHandler(async (req: Request, res: Response) => {
-  const riderId = getAuthenticatedRiderId(req);
+export const changePassword = asyncHandler(
+  async (req: Request, res: Response) => {
+    const riderId = getAuthenticatedRiderId(req);
 
-  if (!riderId) {
-    throw ApiError.unauthorized("Authentication is required.", {
-      code: "AUTHENTICATION_REQUIRED",
+    const {
+      currentPassword,
+      newPassword,
+    } = req.body;
+
+    await changeRiderPassword(
+      riderId,
+      currentPassword,
+      newPassword,
+    );
+
+    clearRiderRefreshCookie(res);
+
+    res.status(200).json({
+      success: true,
+      message:
+        "Rider password changed successfully. Please log in again.",
     });
-  }
-
-  /*
-            |--------------------------------------------------------------------------
-            | Session ID
-            |--------------------------------------------------------------------------
-            */
-
-  const { sessionId } = req.body;
-
-  if (typeof sessionId !== "string") {
-    throw ApiError.badRequest("Session ID is required.", {
-      code: "SESSION_ID_REQUIRED",
-    });
-  }
-
-  /*
-            |--------------------------------------------------------------------------
-            | Find Rider
-            |--------------------------------------------------------------------------
-            */
-
-  const rider = await getRiderById(riderId);
-
-  if (!rider) {
-    throw ApiError.unauthorized("Rider profile was not found.", {
-      code: "RIDER_PROFILE_NOT_FOUND",
-    });
-  }
-
-  /*
-            |--------------------------------------------------------------------------
-            | Logout
-            |--------------------------------------------------------------------------
-            */
-
-  await logoutRider(rider.userId.toString(), sessionId);
-
-  /*
-            |--------------------------------------------------------------------------
-            | Response
-            |--------------------------------------------------------------------------
-            */
-
-  res.status(200).json({
-    success: true,
-
-    message: "Rider logout successful.",
-  });
-});
-
-/*
-|--------------------------------------------------------------------------
-| Get Authenticated Rider
-|--------------------------------------------------------------------------
-*/
-
-export const getMe = asyncHandler(async (req: Request, res: Response) => {
-  const riderId = getAuthenticatedRiderId(req);
-
-  const rider = await getRiderById(riderId);
-
-  const user = await User.findById(rider.userId).select(
-    "name email phone avatarUrl status",
-  );
-
-  if (!user || user.status !== "ACTIVE") {
-    throw ApiError.unauthorized("Rider account is unavailable.", {
-      code: "RIDER_ACCOUNT_UNAVAILABLE",
-    });
-  }
-
-  if (rider.status !== "ACTIVE") {
-    throw ApiError.forbidden("Rider account is not active.", {
-      code: "RIDER_NOT_ACTIVE",
-    });
-  }
-
-  res.status(200).json({
-    success: true,
-    message: "Rider profile retrieved successfully.",
-    data: {
-      id: rider.userId.toString(),
-      riderId: rider._id.toString(),
-      name: user.name,
-      email: user.email ?? rider.email,
-      phone: user.phone ?? rider.phone,
-      avatarUrl: user.avatarUrl,
-      accountType: "RIDER",
-      role: "RIDER",
-      riderCode: rider.riderCode,
-      riderStatus: rider.status,
-      vehicleType: rider.vehicleType,
-      vehicleNumber: rider.vehicleNumber,
-    },
-  });
-});
+  },
+);

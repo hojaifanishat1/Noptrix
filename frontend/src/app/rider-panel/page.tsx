@@ -130,11 +130,18 @@ export default function RiderDashboardPage() {
         </dl>
       </section>
 
-      {status === "PENDING" && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          Your rider account is waiting for Owner activation. You will get delivery access after activation.
-        </div>
-      )}
+        {profile?.onboardingStatus !== "COMPLETED" && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            Your rider account is active. Complete your onboarding verification
+            before you can become available for deliveries.
+            <a
+              href="/rider-panel/verification"
+              className="ml-1 font-semibold underline"
+            >
+              Complete verification
+            </a>
+          </div>
+        )}
     </div>
   );
 }

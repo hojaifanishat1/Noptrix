@@ -441,13 +441,20 @@ export const ADMIN_NAVIGATION_SECTIONS: readonly AdminNavigationSection[] = [
         permission: "riders.read",
       },
       {
+        id: "rider-invitations",
+        label: "Rider Invitations",
+        href: "/admin/rider-invitations",
+        icon: UserPlus,
+        permission: "rider_invitations.read",
+      },
+      /*{
         id: "rider-applications",
         label: "Rider Applications",
         href: "/admin/rider-applications",
         icon: FileCheck,
         permission: "rider_applications.read",
         badgeKey: "riderApplications",
-      },
+      },*/
       {
         id: "rider-verification",
         label: "Rider Verification",
@@ -1186,13 +1193,6 @@ export const ADMIN_NAVIGATION_SECTIONS: readonly AdminNavigationSection[] = [
         href: "/admin/employee-invitations",
         icon: UserPlus,
         permission: "employee_invitations.read",
-      },
-      {
-        id: "hr-rider-invitations",
-        label: "Rider Invitations",
-        href: "/admin/rider-invitations",
-        icon: UserPlus,
-        permission: "rider_invitations.read",
       },
       {
         id: "employee-activity",

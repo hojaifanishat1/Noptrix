@@ -7,7 +7,6 @@ import {
   Activity,
   Bike,
   Eye,
-  Plus,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -189,6 +188,7 @@ export default function OwnerRidersPage() {
     } catch (requestError) {
       setError(getErrorMessage(requestError));
       setRiders([]);
+      setPagination(EMPTY_PAGINATION);
     } finally {
       setLoading(false);
     }
@@ -410,13 +410,6 @@ export default function OwnerRidersPage() {
             Refresh
           </button>
 
-          <Link
-            href="/admin/riders/new"
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-700"
-          >
-            <Plus className="h-4 w-4" />
-            Add Rider
-          </Link>
         </div>
       </header>
 
@@ -543,7 +536,7 @@ export default function OwnerRidersPage() {
           </div>
 
           <p className="text-xs text-slate-500">
-            Page {pagination.page} of {Math.max(pagination.totalPages, 1)}
+            Page {Math.max(1, pagination.page)} of {Math.max(1, pagination.totalPages)}
           </p>
         </div>
 
@@ -553,7 +546,11 @@ export default function OwnerRidersPage() {
           getRowKey={(rider) => rider._id}
           loading={loading}
           loadingRows={8}
-          emptyMessage="No riders found. Try changing your filters."
+          emptyMessage={
+            search.trim() || status || type
+              ? "No riders match your current search or filters."
+              : "No rider profiles yet. Riders will appear here after accepting an invitation."
+          }
         />
 
         {/* Pagination */}

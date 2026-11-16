@@ -2,6 +2,9 @@
 
 import { isAxiosError } from "axios";
 import Link from "next/link";
+
+import RiderDocumentReview from "@/features/riders/rider-document-review";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -195,17 +198,15 @@ export default function RiderVerificationPage() {
               Rider Verification
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Verify rider profile details and manage status through the riders API.
+              Review rider identity, uploaded documents, onboarding progress and account status.
             </p>
           </div>
         </div>
       </header>
 
       <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-        The backend stores rider identity and license numbers, but does not
-        provide document uploads or a separate background-check workflow.
-        Verification details below reflect the rider profile fields currently
-        available.
+        Review submitted National ID, driving license, vehicle registration
+        and insurance documents. Approve or reject each document with a reason.
       </div>
 
       {error && (
@@ -374,6 +375,10 @@ export default function RiderVerificationPage() {
                   ))}
                 </div>
               </div>
+                <RiderDocumentReview
+                  riderId={rider._id}
+                  riderName={rider.name}
+                />
             </article>
           ))
         )}
@@ -393,7 +398,7 @@ export default function RiderVerificationPage() {
             Previous
           </button>
           <span className="text-sm text-slate-600">
-            {pagination.page} / {pagination.totalPages}
+            {pagination.page} / {Math.max(1, pagination.totalPages)}
           </span>
           <button
             type="button"

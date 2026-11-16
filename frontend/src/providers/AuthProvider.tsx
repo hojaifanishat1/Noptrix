@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 
 import { useAuthStore } from "@/stores/auth.store";
+import type { AuthUser } from "@/types/auth";
 
 import { adminAuthApi } from "@/services/api/admin-auth.api";
 import { employeeAuthApi } from "@/services/api/employee-auth.api";
@@ -87,6 +88,33 @@ let customerRefreshPromise:
         >
     >
     | null = null;
+
+/*
+|--------------------------------------------------------------------------
+| Rider Refresh Single-Flight
+|--------------------------------------------------------------------------
+*/
+
+let riderRefreshPromise:
+    | Promise<
+        Awaited<
+            ReturnType<
+                typeof riderAuthApi.refresh
+            >
+        >
+    >
+    | null = null;
+
+const refreshRiderOnce = () => {
+    if (!riderRefreshPromise) {
+        riderRefreshPromise =
+            riderAuthApi.refresh().finally(() => {
+                riderRefreshPromise = null;
+            });
+    }
+
+    return riderRefreshPromise;
+};
 
 const refreshCustomerOnce = () => {
     if (!customerRefreshPromise) {
@@ -338,7 +366,7 @@ export function AuthProvider({
                     |--------------------------------------------------------------------------
                     */
 
-                    let user;
+                    let user: AuthUser;
 
                     switch (
                         stored.accountType
@@ -371,10 +399,26 @@ export function AuthProvider({
                             break;
                         }
 
-                        case "RIDER":
-                            user =
+                        case "RIDER": {
+                            const response =
+                                await refreshRiderOnce();
+
+                            tokenStorage.set(
+                                response.accessToken,
+                            );
+
+                            const profile =
                                 await riderAuthApi.getMe();
+
+                            user = {
+                                ...profile,
+                                id: response.riderId,
+                                accountType: "RIDER",
+                                role: "RIDER",
+                            };
+
                             break;
+                        }
 
                         default:
                             throw new Error(

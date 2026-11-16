@@ -26,9 +26,14 @@ export const riderInvitationTokenSchema = z
 export const acceptRiderInvitationSchema = z
   .object({
     token: z.string().trim().min(1),
-    password: z.string().min(8).max(128).optional(),
+    password: z.string().min(8).max(128),
+    confirmPassword: z.string().min(8).max(128),
   })
-  .strict();
+  .strict()
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Password and confirm password do not match.",
+    path: ["confirmPassword"],
+  });
 
 export const riderInvitationQuerySchema = z
   .object({

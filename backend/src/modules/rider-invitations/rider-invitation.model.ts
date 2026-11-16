@@ -25,6 +25,8 @@ export interface IRiderInvitation extends Document {
   vehicleNumber?: string;
   licenseNumber?: string;
   nationalId?: string;
+  riderCode: string;
+  applicationId?: Types.ObjectId;
   tokenHash: string;
   invitedBy: Types.ObjectId;
   status: RiderInvitationStatus;
@@ -48,6 +50,8 @@ const riderInvitationSchema = new Schema<IRiderInvitation>(
     vehicleNumber: { type: String, trim: true, uppercase: true, maxlength: 50 },
     licenseNumber: { type: String, trim: true, uppercase: true, maxlength: 100 },
     nationalId: { type: String, trim: true, maxlength: 100 },
+    riderCode: { type: String, required: true, trim: true, uppercase: true, maxlength: 50 },
+    applicationId: { type: Schema.Types.ObjectId, ref: "JobApplication", index: true },
     tokenHash: { type: String, required: true, unique: true, select: false },
     invitedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     status: { type: String, enum: RIDER_INVITATION_STATUSES, default: "PENDING", required: true, index: true },
@@ -63,6 +67,7 @@ const riderInvitationSchema = new Schema<IRiderInvitation>(
 
 riderInvitationSchema.index({ email: 1, status: 1, createdAt: -1 });
 riderInvitationSchema.index({ status: 1, expiresAt: 1 });
+riderInvitationSchema.index({ applicationId: 1 }, { sparse: true });
 riderInvitationSchema.index(
   { email: 1 },
   {

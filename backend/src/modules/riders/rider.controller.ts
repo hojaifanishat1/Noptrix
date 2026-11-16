@@ -22,7 +22,6 @@ import {
 import {
   createRider,
   getRiderById,
-  getRiderByUserId,
   getAllRiders,
   updateRider,
   updateRiderStatus,
@@ -266,7 +265,7 @@ export const convertSelectedApplicationToRiderController = asyncHandler(
     res.status(201).json(
       ApiResponse.created(
         rider,
-        "Selected applicant converted to rider successfully.",
+        "Rider invitation sent to the selected applicant successfully.",
       ).serialize(),
     );
   },

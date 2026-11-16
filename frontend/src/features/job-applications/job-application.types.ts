@@ -94,6 +94,12 @@ export interface JobApplication {
 
     riderConversionRequestedBy?: string;
 
+    riderInvitationId?: string;
+
+    riderInvitationSentAt?: string;
+
+    riderInvitationSentBy?: string;
+
     convertedToRiderAt?: string;
 
     riderId?: string;

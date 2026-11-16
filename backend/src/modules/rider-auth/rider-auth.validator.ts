@@ -1,20 +1,7 @@
 import { z } from "zod";
 
-/*
-|--------------------------------------------------------------------------
-| Constants
-|--------------------------------------------------------------------------
-*/
-
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
-
-/*
-|--------------------------------------------------------------------------
-| Login
-|--------------------------------------------------------------------------
-*/
 
 export const riderLoginSchema = z
   .object({
@@ -31,66 +18,85 @@ export const riderLoginSchema = z
       .regex(PHONE_REGEX, "Invalid phone number.")
       .optional(),
 
-    password: z.string().min(1, "Password is required."),
+    password: z
+      .string()
+      .min(1, "Password is required."),
   })
-  .refine((data) => Boolean(data.email || data.phone), {
-    message: "Email or phone is required.",
-    path: ["email"],
-  });
+  .refine(
+    (data) => Boolean(data.email || data.phone),
+    {
+      message: "Email or phone is required.",
+      path: ["email"],
+    },
+  );
 
-/*
-|--------------------------------------------------------------------------
-| Refresh Token
-|--------------------------------------------------------------------------
-*/
+export const riderVerifyLoginSchema = z.object({
+  challengeId: z
+    .string()
+    .trim()
+    .min(32, "Invalid verification challenge."),
 
-export const riderRefreshTokenSchema = z.object({
-  refreshToken: z.string().trim().min(1, "Refresh token is required."),
+  code: z
+    .string()
+    .trim()
+    .regex(/^\d{4,8}$/, "Invalid verification code."),
 });
 
-/*
-|--------------------------------------------------------------------------
-| Logout
-|--------------------------------------------------------------------------
-*/
-
-export const riderLogoutSchema = z.object({
-  sessionId: z.string().trim().min(1, "Session ID is required."),
+export const riderResendLoginCodeSchema = z.object({
+  challengeId: z
+    .string()
+    .trim()
+    .min(32, "Invalid verification challenge."),
 });
 
-/*
-|--------------------------------------------------------------------------
-| Change Password
-|--------------------------------------------------------------------------
-*/
+// Refresh token is read from the httpOnly cookie.
+export const riderRefreshTokenSchema = z.object({});
+
+// Logout uses the refresh-token cookie.
+export const riderLogoutSchema = z.object({});
 
 export const riderChangePasswordSchema = z
   .object({
-    currentPassword: z.string().min(1, "Current password is required."),
+    currentPassword: z
+      .string()
+      .min(1, "Current password is required."),
 
     newPassword: z
       .string()
       .min(8, "New password must be at least 8 characters.")
       .max(128, "New password cannot exceed 128 characters."),
 
-    confirmPassword: z.string().min(1, "Password confirmation is required."),
+    confirmPassword: z
+      .string()
+      .min(1, "Password confirmation is required."),
   })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Passwords do not match.",
-    path: ["confirmPassword"],
-  });
+  .refine(
+    (data) => data.newPassword === data.confirmPassword,
+    {
+      message: "Passwords do not match.",
+      path: ["confirmPassword"],
+    },
+  );
 
-/*
-|--------------------------------------------------------------------------
-| Type Inference
-|--------------------------------------------------------------------------
-*/
+export type RiderLoginInput = z.infer<
+  typeof riderLoginSchema
+>;
 
-export type RiderLoginInput = z.infer<typeof riderLoginSchema>;
+export type RiderVerifyLoginInput = z.infer<
+  typeof riderVerifyLoginSchema
+>;
 
-export type RiderRefreshTokenInput = z.infer<typeof riderRefreshTokenSchema>;
+export type RiderResendLoginCodeInput = z.infer<
+  typeof riderResendLoginCodeSchema
+>;
 
-export type RiderLogoutInput = z.infer<typeof riderLogoutSchema>;
+export type RiderRefreshTokenInput = z.infer<
+  typeof riderRefreshTokenSchema
+>;
+
+export type RiderLogoutInput = z.infer<
+  typeof riderLogoutSchema
+>;
 
 export type RiderChangePasswordInput = z.infer<
   typeof riderChangePasswordSchema

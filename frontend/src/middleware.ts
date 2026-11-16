@@ -30,6 +30,7 @@ const AUTH_PATHS = [
 
     "/seller/login",
     "/rider/login",
+    "/rider/verify-otp",
 ] as const;
 
 /*
@@ -130,5 +131,6 @@ export const config = {
         "/admin/:path*",
         "/seller-panel/:path*",
         "/rider-panel/:path*",
+        "/rider/:path*",
     ],
 };

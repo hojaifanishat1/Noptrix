@@ -32,6 +32,7 @@ export type OtpChannel = (typeof OTP_CHANNELS)[keyof typeof OTP_CHANNELS];
 
 export const OTP_PURPOSES = {
   LOGIN: "login",
+  LOGIN_VERIFICATION: "LOGIN_VERIFICATION",
   REGISTER: "register",
   EMAIL_VERIFICATION: "email_verification",
   PHONE_VERIFICATION: "phone_verification",

@@ -365,10 +365,10 @@ export const updateTrackingLocation = async (
   }
 
   if (actorId) {
-    const riderUserObjectId = validateObjectId(actorId, "rider user ID");
+    const riderObjectId = validateObjectId(actorId, "rider ID");
 
     const rider = await Rider.findOne({
-      userId: riderUserObjectId,
+      _id: riderObjectId,
       status: "ACTIVE",
     })
       .select("_id")

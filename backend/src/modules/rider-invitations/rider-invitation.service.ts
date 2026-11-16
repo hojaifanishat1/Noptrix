@@ -6,8 +6,8 @@ import { env } from "../../config/env";
 import { sendEmail } from "../../services/email.service";
 import { ApiError } from "../../utils/ApiError";
 
-import { User } from "../users/user.model";
 import { Rider } from "../riders/rider.model";
+import { JobApplication } from "../job-applications/application.model";
 import { RiderInvitation } from "./rider-invitation.model";
 
 import {
@@ -84,6 +84,7 @@ const getActiveInvitation = async (
 export const createRiderInvitation = async (
   invitedBy: string,
   input: CreateRiderInvitationInput,
+  options?: { applicationId?: string; riderCode?: string },
 ) => {
   if (!Types.ObjectId.isValid(invitedBy)) {
     throw ApiError.badRequest("Invalid inviter ID.");
@@ -91,6 +92,17 @@ export const createRiderInvitation = async (
 
   const email = normalizeEmail(input.email);
   const now = new Date();
+
+  if (
+    options?.applicationId &&
+    !Types.ObjectId.isValid(options.applicationId)
+  ) {
+    throw ApiError.badRequest("Invalid job application ID.");
+  }
+
+  const riderCode =
+    options?.riderCode?.trim().toUpperCase() ||
+    `RDR-${randomBytes(6).toString("hex").toUpperCase()}`;
 
   if (await Rider.exists({ email })) {
     throw ApiError.conflict(
@@ -124,6 +136,12 @@ export const createRiderInvitation = async (
     );
   }
 
+  const duplicateRiderCode = await Rider.exists({ riderCode });
+
+  if (duplicateRiderCode) {
+    throw ApiError.conflict("Rider code already exists.");
+  }
+
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(
     now.getTime() + INVITATION_EXPIRY_HOURS * 60 * 60 * 1000,
@@ -135,6 +153,10 @@ export const createRiderInvitation = async (
     invitation = await RiderInvitation.create({
       ...input,
       email,
+      riderCode,
+      applicationId: options?.applicationId
+        ? new Types.ObjectId(options.applicationId)
+        : undefined,
       tokenHash: hashToken(token),
       invitedBy: new Types.ObjectId(invitedBy),
       status: "PENDING",
@@ -224,19 +246,6 @@ export const createRiderInvitation = async (
 export const getRiderInvitationByToken = async (token: string) => {
   const invitation = await getActiveInvitation(token);
 
-  const existingUser = await User.findOne({
-    email: invitation.email,
-  })
-    .select("status")
-    .lean()
-    .exec();
-
-  if (existingUser && existingUser.status !== "ACTIVE") {
-    throw ApiError.forbidden(
-      "The existing account is not active. Please contact support.",
-    );
-  }
-
   return {
     invitationId: invitation._id.toString(),
     name: invitation.name,
@@ -244,112 +253,38 @@ export const getRiderInvitationByToken = async (token: string) => {
     phone: invitation.phone,
     type: invitation.type,
     vehicleType: invitation.vehicleType,
+    vehicleNumber: invitation.vehicleNumber,
+    riderCode: invitation.riderCode,
     expiresAt: invitation.expiresAt,
-    requiresPassword: !existingUser,
+    requiresPassword: true,
   };
 };
-
-/*
-|--------------------------------------------------------------------------
-| Accept Rider Invitation
-|--------------------------------------------------------------------------
-*/
 
 export const acceptRiderInvitation = async (
   input: AcceptRiderInvitationInput,
 ) => {
+  if (input.password !== input.confirmPassword) {
+    throw ApiError.badRequest("Password and confirm password do not match.");
+  }
+
   const session = await startSession();
 
   try {
     session.startTransaction();
 
-    const invitation = await getActiveInvitation(
-      input.token,
-      session,
-    );
+    const invitation = await getActiveInvitation(input.token, session);
+    const email = normalizeEmail(invitation.email);
 
-    let user = await User.findOne({
-      email: invitation.email,
-    })
-      .select("+password")
+    const existingRider = await Rider.findOne({ email })
       .session(session)
       .exec();
 
-    /*
-     * Existing User:
-     * - Reuse the account.
-     * - Never overwrite the existing password.
-     * - Never reactivate an inactive account.
-     */
-    if (user) {
-      if (user.status !== "ACTIVE") {
-        throw ApiError.forbidden(
-          "Your existing account is not active. Please contact support.",
-        );
-      }
-    } else {
-      if (!input.password) {
-        throw ApiError.badRequest(
-          "Create a password to finish setting up your rider account.",
-        );
-      }
-
-      /*
-       * User phone has a unique index.
-       * Prevent attaching a phone already owned by another account.
-       */
-      if (invitation.phone) {
-        const existingPhone = await User.exists({
-          phone: invitation.phone,
-        }).session(session);
-
-        if (existingPhone) {
-          throw ApiError.conflict(
-            "This phone number is already associated with another account.",
-          );
-        }
-      }
-
-      const hashedPassword = await bcrypt.hash(
-        input.password,
-        PASSWORD_SALT_ROUNDS,
-      );
-
-      const [createdUser] = await User.create(
-        [
-          {
-            name: invitation.name,
-            email: invitation.email,
-            phone: invitation.phone,
-            password: hashedPassword,
-            status: "ACTIVE",
-            isEmailVerified: true,
-            isPhoneVerified: false,
-          },
-        ],
-        { session },
-      );
-
-      user = createdUser;
-    }
-
-    /*
-     * Prevent duplicate Rider profiles for the same User.
-     */
-    const existingRider = await Rider.exists({
-      userId: user._id,
-    }).session(session);
-
     if (existingRider) {
       throw ApiError.conflict(
-        "This account already has a rider profile.",
+        "A rider account already exists with this email address.",
       );
     }
 
-    /*
-     * Atomically claim the invitation.
-     * Only one concurrent acceptance can change PENDING to ACCEPTED.
-     */
     const acceptedAt = new Date();
 
     const lockedInvitation = await RiderInvitation.findOneAndUpdate(
@@ -362,7 +297,6 @@ export const acceptRiderInvitation = async (
         $set: {
           status: "ACCEPTED",
           acceptedAt,
-          acceptedUserId: user._id,
         },
       },
       {
@@ -377,23 +311,29 @@ export const acceptRiderInvitation = async (
       );
     }
 
-    const riderCode =
-      `RDR-${randomBytes(6).toString("hex").toUpperCase()}`;
+    const hashedPassword = await bcrypt.hash(
+      input.password,
+      PASSWORD_SALT_ROUNDS,
+    );
 
     const [rider] = await Rider.create(
       [
         {
-          userId: user._id,
-          riderCode,
+          riderCode: invitation.riderCode,
+          jobApplicationId: invitation.applicationId,
           type: invitation.type,
           name: invitation.name,
-          email: invitation.email,
+          email,
           phone: invitation.phone,
+          password: hashedPassword,
+          passwordChangedAt: acceptedAt,
+          failedLoginAttempts: 0,
           vehicleType: invitation.vehicleType,
           vehicleNumber: invitation.vehicleNumber,
           licenseNumber: invitation.licenseNumber,
           nationalId: invitation.nationalId,
-          status: "PENDING",
+          status: "ACTIVE",
+          onboardingStatus: "IN_PROGRESS",
           isAvailable: false,
           createdBy: invitation.invitedBy,
         },
@@ -402,8 +342,33 @@ export const acceptRiderInvitation = async (
     );
 
     lockedInvitation.riderId = rider._id;
-
     await lockedInvitation.save({ session });
+
+    if (invitation.applicationId) {
+      const applicationUpdate = await JobApplication.updateOne(
+        {
+          _id: invitation.applicationId,
+          status: "SELECTED",
+          riderInvitationId: invitation._id,
+          riderId: { $exists: false },
+          convertedToRiderAt: { $exists: false },
+        },
+        {
+          $set: {
+            riderId: rider._id,
+            convertedToRiderAt: acceptedAt,
+            convertedToRiderBy: invitation.invitedBy,
+          },
+        },
+        { session },
+      ).exec();
+
+      if (applicationUpdate.matchedCount !== 1) {
+        throw ApiError.conflict(
+          "The related job application has already been processed.",
+        );
+      }
+    }
 
     await session.commitTransaction();
 
@@ -412,8 +377,9 @@ export const acceptRiderInvitation = async (
       riderCode: rider.riderCode,
       email: rider.email,
       status: rider.status,
+      onboardingStatus: rider.onboardingStatus,
       message:
-        "Invitation accepted. Your rider profile is waiting for Owner approval.",
+        "Rider account activated. Complete your onboarding to start accepting deliveries.",
     };
   } catch (error: unknown) {
     if (session.inTransaction()) {
@@ -422,7 +388,7 @@ export const acceptRiderInvitation = async (
 
     if (isDuplicateKeyError(error)) {
       throw ApiError.conflict(
-        "This account already has a rider profile or the invitation was already accepted.",
+        "This rider account or rider code already exists, or the invitation was already accepted.",
       );
     }
 
@@ -431,12 +397,6 @@ export const acceptRiderInvitation = async (
     await session.endSession();
   }
 };
-
-/*
-|--------------------------------------------------------------------------
-| List Rider Invitations
-|--------------------------------------------------------------------------
-*/
 
 export const listRiderInvitations = async (
   query: RiderInvitationQuery,

@@ -52,6 +52,9 @@ export interface IJobApplication extends Document {
 
   notes?: string;
   riderId?: Types.ObjectId;
+  riderInvitationId?: Types.ObjectId;
+  riderInvitationSentAt?: Date;
+  riderInvitationSentBy?: Types.ObjectId;
   convertedToRiderAt?: Date;
   convertedToRiderBy?: Types.ObjectId;
   riderConversionRequestedAt?: Date;
@@ -172,6 +175,17 @@ const jobApplicationSchema = new Schema<IJobApplication>(
       type: Schema.Types.ObjectId,
       ref: "Rider",
     },
+    riderInvitationId: {
+      type: Schema.Types.ObjectId,
+      ref: "RiderInvitation",
+    },
+    riderInvitationSentAt: {
+      type: Date,
+    },
+    riderInvitationSentBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
     convertedToRiderAt: {
       type: Date,
     },
@@ -232,6 +246,7 @@ jobApplicationSchema.index({
 */
 
 jobApplicationSchema.index({ riderId: 1 }, { sparse: true });
+jobApplicationSchema.index({ riderInvitationId: 1 }, { sparse: true });
 jobApplicationSchema.index({
   status: 1,
   riderConversionRequestedAt: 1,

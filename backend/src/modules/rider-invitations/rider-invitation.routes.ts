@@ -7,14 +7,12 @@ import { requirePermissionMatch } from "../../middlewares/permission.middleware"
 import { validate } from "../../middlewares/validation.middleware";
 import {
   acceptRiderInvitationController,
-  createRiderInvitationController,
   getRiderInvitationByTokenController,
   listRiderInvitationsController,
   revokeRiderInvitationController,
 } from "./rider-invitation.controller";
 import {
   acceptRiderInvitationSchema,
-  createRiderInvitationSchema,
   riderInvitationIdParamSchema,
   riderInvitationQuerySchema,
   riderInvitationTokenSchema,
@@ -22,14 +20,6 @@ import {
 
 const router = Router();
 const managementAuth = [adminAuth, adminSecretVerified];
-
-router.post(
-  "/",
-  ...managementAuth,
-  requirePermissionMatch("rider_invitations.create", "rider_invitations.manage"),
-  validate(createRiderInvitationSchema, "body"),
-  createRiderInvitationController,
-);
 
 router.get(
   "/validate",

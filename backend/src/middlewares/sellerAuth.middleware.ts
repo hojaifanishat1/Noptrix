@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from "express";
 import { verifyAccessToken } from "../utils/token";
 
 import { ApiError } from "../utils/ApiError";
+import { Seller } from "../modules/sellers/seller.model";
 
 /*
 |--------------------------------------------------------------------------
@@ -90,11 +91,11 @@ const buildSellerAuthContext = (
 |--------------------------------------------------------------------------
 */
 
-export const sellerAuth = (
+export const sellerAuth = async (
   req: Request,
   _res: Response,
   next: NextFunction,
-): void => {
+): Promise<void> => {
   try {
     const token = extractBearerToken(req);
 
@@ -106,23 +107,11 @@ export const sellerAuth = (
 
     const payload = verifyAccessToken(token);
 
-    /*
-        |--------------------------------------------------------------------------
-        | Token Type
-        |--------------------------------------------------------------------------
-        */
-
     if (payload.tokenType !== "access") {
       throw ApiError.unauthorized("Invalid seller access token.", {
         code: "INVALID_TOKEN_TYPE",
       });
     }
-
-    /*
-        |--------------------------------------------------------------------------
-        | Seller Role
-        |--------------------------------------------------------------------------
-        */
 
     if (payload.role !== "SELLER") {
       throw ApiError.forbidden("Seller access required.", {
@@ -130,19 +119,32 @@ export const sellerAuth = (
       });
     }
 
-    /*
-        |--------------------------------------------------------------------------
-        | Seller ID
-        |--------------------------------------------------------------------------
-        */
-
     if (typeof payload.sub !== "string" || !payload.sub.trim()) {
       throw ApiError.unauthorized("Seller token subject is invalid.", {
         code: "INVALID_SELLER_SUBJECT",
       });
     }
 
-    req.sellerAuth = buildSellerAuthContext(payload as Record<string, unknown>);
+    const seller = await Seller.findById(payload.sub)
+      .select("_id status")
+      .lean()
+      .exec();
+
+    if (!seller) {
+      throw ApiError.unauthorized("Seller account was not found.", {
+        code: "SELLER_ACCOUNT_NOT_FOUND",
+      });
+    }
+
+    if (seller.status !== "ACTIVE") {
+      throw ApiError.forbidden("Seller account is not active.", {
+        code: "SELLER_ACCOUNT_INACTIVE",
+      });
+    }
+
+    req.sellerAuth = buildSellerAuthContext(
+      payload as Record<string, unknown>,
+    );
 
     next();
   } catch (error) {

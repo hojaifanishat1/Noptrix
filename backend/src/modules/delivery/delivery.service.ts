@@ -3,6 +3,7 @@ import { Types } from "mongoose";
 
 import { logger } from "../../utils/logger";
 import { Delivery } from "./delivery.model";
+import { Rider } from "../riders/rider.model";
 
 import type { DeliveryStatus } from "./delivery.types";
 
@@ -129,6 +130,36 @@ export class DeliveryService {
     if (!["pending", "failed"].includes(delivery.status)) {
       throw new DeliveryServiceError(
         "Rider can only be assigned to pending or failed deliveries",
+        409,
+      );
+    }
+
+    const rider = await Rider.findById(riderId)
+      .select("_id status onboardingStatus isAvailable")
+      .lean()
+      .exec();
+
+    if (!rider) {
+      throw new DeliveryServiceError("Rider not found", 404);
+    }
+
+    if (rider.status !== "ACTIVE") {
+      throw new DeliveryServiceError(
+        "Only active riders can be assigned to deliveries",
+        409,
+      );
+    }
+
+    if (rider.onboardingStatus !== "COMPLETED") {
+      throw new DeliveryServiceError(
+        "Rider must complete onboarding before receiving deliveries",
+        409,
+      );
+    }
+
+    if (!rider.isAvailable) {
+      throw new DeliveryServiceError(
+        "Rider is not currently available for deliveries",
         409,
       );
     }

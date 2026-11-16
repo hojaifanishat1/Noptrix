@@ -301,7 +301,8 @@ export const acceptSellerInvitation = async (
     description: application.description,
     logoUrl: application.logoUrl,
     website: application.website,
-    status: "PENDING",
+    status: "ACTIVE",
+    onboardingStatus: "IN_PROGRESS",
   });
 
   invitation.status = "ACCEPTED";
@@ -314,5 +315,6 @@ export const acceptSellerInvitation = async (
     sellerCode: seller.sellerCode,
     email: seller.email,
     status: seller.status,
+    onboardingStatus: seller.onboardingStatus,
   };
 };

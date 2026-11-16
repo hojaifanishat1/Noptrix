@@ -16,7 +16,7 @@ import {
 */
 
 export interface IRider extends Document {
-  userId: Types.ObjectId;
+  userId?: Types.ObjectId;
   jobApplicationId?: Types.ObjectId;
 
   riderCode: string;
@@ -28,6 +28,12 @@ export interface IRider extends Document {
   email: string;
 
   phone?: string;
+  password?: string;
+  failedLoginAttempts: number;
+  lockUntil?: Date;
+  passwordChangedAt?: Date;
+  lastLoginAt?: Date;
+
 
   vehicleType?: RiderVehicleType;
 
@@ -38,6 +44,8 @@ export interface IRider extends Document {
   nationalId?: string;
 
   status: RiderStatus;
+  onboardingStatus: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
+  onboardingCompletedAt?: Date;
   isAvailable: boolean;
   currentLatitude?: number;
   currentLongitude?: number;
@@ -80,8 +88,7 @@ const riderSchema = new Schema<IRider>(
     userId: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: true,
-      unique: true,
+      required: false,
       index: true,
     },
 
@@ -127,6 +134,33 @@ const riderSchema = new Schema<IRider>(
       type: String,
       trim: true,
       maxlength: 30,
+    },
+
+    password: {
+      type: String,
+      required: false,
+      select: false,
+    },
+
+    failedLoginAttempts: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    lockUntil: {
+      type: Date,
+      default: undefined,
+    },
+
+    passwordChangedAt: {
+      type: Date,
+      default: undefined,
+    },
+
+    lastLoginAt: {
+      type: Date,
+      default: undefined,
     },
 
     vehicleType: {
@@ -195,6 +229,18 @@ const riderSchema = new Schema<IRider>(
       required: true,
       default: "PENDING",
       index: true,
+    },
+
+    onboardingStatus: {
+      type: String,
+      enum: ["NOT_STARTED", "IN_PROGRESS", "COMPLETED"],
+      default: "NOT_STARTED",
+      required: true,
+      index: true,
+    },
+
+    onboardingCompletedAt: {
+      type: Date,
     },
 
     joinedAt: {

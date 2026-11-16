@@ -8,7 +8,6 @@ import { getAuthenticatedOwnerId } from "../../middlewares/ownerAuth.middleware"
 
 import { getAuthenticatedRiderId } from "../../middlewares/riderAuth.middleware";
 
-import { getRiderById } from "../riders/rider.service";
 
 import {
   createRiderEarning,
@@ -19,7 +18,7 @@ import {
   deleteRiderEarning,
   getRiderEarningSummary,
   getRiderEarningsByRider,
-  requireRiderEarningForUser,
+  requireRiderEarningForRider,
 } from "./riderEarning.service";
 
 import {
@@ -170,15 +169,12 @@ export const deleteRiderEarningController = asyncHandler(
 export const getMyRiderEarningsController = asyncHandler(
   async (req: Request, res: Response) => {
     const riderId = getAuthenticatedRiderId(req);
-
     const query = getValidatedQuery(req);
-
     const result = await getRiderEarningsByRider(riderId, query);
 
     res.status(200).json({
       success: true,
-      data: result.earnings,
-      pagination: result.pagination,
+      data: result,
     });
   },
 );
@@ -186,20 +182,8 @@ export const getMyRiderEarningsController = asyncHandler(
 export const getMyRiderEarningController = asyncHandler(
   async (req: Request, res: Response) => {
     const { earningId } = riderEarningIdParamSchema.parse(req.params);
-
     const riderId = getAuthenticatedRiderId(req);
-
-    const rider = await getRiderById(riderId);
-
-    if (!rider) {
-      throw ApiError.unauthorized("Rider profile was not found.", {
-        code: "RIDER_PROFILE_NOT_FOUND",
-      });
-    }
-
-    const userId = rider.userId.toString();
-
-    const earning = await requireRiderEarningForUser(earningId, userId);
+    const earning = await requireRiderEarningForRider(earningId, riderId);
 
     res.status(200).json({
       success: true,

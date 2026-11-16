@@ -724,7 +724,7 @@ export default function JobApplicationsPage() {
 
                     if (
                         !window.confirm(
-                            `Convert this selected applicant directly into a PENDING Rider with code ${riderCode}?`,
+                            `Send a Rider invitation to this selected applicant with Rider Code ${riderCode}?`,
                         )
                     ) {
                         return;
@@ -732,7 +732,7 @@ export default function JobApplicationsPage() {
                 } else {
                     if (
                         !window.confirm(
-                            "Submit this selected applicant for owner approval to become a PENDING Rider?",
+                            "Submit a request to the Owner to send a Rider invitation to this selected applicant?",
                         )
                     ) {
                         return;
@@ -744,13 +744,22 @@ export default function JobApplicationsPage() {
 
                 try {
                     if (isOwner) {
-                        await ridersApi.convertApplication(
-                            applicationId,
-                            { riderCode },
+                        const invitation =
+                            await ridersApi.convertApplication(
+                                applicationId,
+                                { riderCode },
+                            );
+
+                        window.alert(
+                            `Rider invitation sent successfully.\n\nName: ${invitation.name}\nEmail: ${invitation.email}\nRider Code: ${invitation.riderCode}\nExpires: ${new Date(invitation.expiresAt).toLocaleString()}`,
                         );
                     } else {
                         await jobApplicationsApi.requestRiderConversion(
                             applicationId,
+                        );
+
+                        window.alert(
+                            "Rider invitation request submitted. The Owner can now send the invitation.",
                         );
                     }
 
@@ -1816,7 +1825,11 @@ function ApplicationRow({
                     <div className="px-5 py-4">
                         {application.status === "SELECTED" ? (
                             isRiderVacancy ? (
-                                application.riderConversionRequestedAt && !isOwner ? (
+                                application.riderInvitationSentAt ? (
+                                    <span className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-xs font-semibold text-green-800">
+                                        Rider invitation sent
+                                    </span>
+                                ) : application.riderConversionRequestedAt && !isOwner ? (
                                     <span className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
                                         Awaiting owner approval
                                     </span>
@@ -1829,12 +1842,10 @@ function ApplicationRow({
                                     >
                                         <UserPlus size={14} />
                                         {isUpdating
-                                            ? (isOwner ? "Converting..." : "Submitting...")
+                                            ? (isOwner ? "Sending invitation..." : "Submitting request...")
                                             : isOwner
-                                              ? (application.riderConversionRequestedAt
-                                                  ? "Approve & Convert to Rider"
-                                                  : "Convert to Rider")
-                                              : "Request Rider Conversion"}
+                                              ? "Send Rider Invitation"
+                                              : "Request Rider Invitation"}
                                     </button>
                                 )
                             ) : (
@@ -2044,7 +2055,11 @@ function MobileApplicationCard({
                 <div className="mt-4">
                     {application.status === "SELECTED" ? (
                         isRiderVacancy ? (
-                            application.riderConversionRequestedAt && !isOwner ? (
+                            application.riderInvitationSentAt ? (
+                                <span className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-green-50 px-4 py-2.5 text-sm font-semibold text-green-800">
+                                    Rider invitation sent
+                                </span>
+                            ) : application.riderConversionRequestedAt && !isOwner ? (
                                 <span className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800">
                                     Awaiting owner approval
                                 </span>
@@ -2057,12 +2072,10 @@ function MobileApplicationCard({
                                 >
                                     <UserPlus size={16} />
                                     {isUpdating
-                                            ? (isOwner ? "Converting..." : "Submitting...")
+                                            ? (isOwner ? "Sending invitation..." : "Submitting request...")
                                             : isOwner
-                                              ? (application.riderConversionRequestedAt
-                                                  ? "Approve & Convert to Rider"
-                                                  : "Convert to Rider")
-                                              : "Request Rider Conversion"}
+                                              ? "Send Rider Invitation"
+                                              : "Request Rider Invitation"}
                                 </button>
                             )
                         ) : (
