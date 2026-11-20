@@ -7,6 +7,10 @@ import {
 
 import { riderAuth } from "../../middlewares/riderAuth.middleware";
 
+import {
+  requireRiderOnboardingCompleted,
+} from "../onboarding/require-rider-onboarding.middleware";
+
 import { validate } from "../../middlewares/validation.middleware";
 
 import {
@@ -37,6 +41,7 @@ const ownerOnly = [ownerAuth, ownerSecretVerified];
 router.post(
   "/",
   riderAuth,
+  requireRiderOnboardingCompleted,
   validate(createCODSchema, "body"),
   createCODController,
 );
@@ -51,6 +56,7 @@ router.get(
 router.patch(
   "/:codId/collect",
   riderAuth,
+  requireRiderOnboardingCompleted,
   validate(codIdParamSchema, "params"),
   validate(collectCODSchema, "body"),
   collectCODController,

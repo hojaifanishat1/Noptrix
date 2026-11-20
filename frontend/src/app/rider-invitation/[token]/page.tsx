@@ -109,11 +109,18 @@ export default function RiderInvitationPage({ params }: PageProps) {
         confirmPassword,
       });
 
-      if (result.status !== "PENDING") {
-        throw new Error("Unexpected rider account status.");
+      if (
+        result.status !== "ACTIVE" ||
+        result.onboardingStatus !== "IN_PROGRESS"
+      ) {
+        throw new Error(
+          "Rider account activation could not be verified. Please contact support.",
+        );
       }
 
       setAccepted(true);
+      setPassword("");
+      setConfirmPassword("");
     } catch (requestError) {
       setError(getErrorMessage(requestError));
     } finally {
@@ -153,9 +160,9 @@ export default function RiderInvitationPage({ params }: PageProps) {
               </h2>
 
               <p className="mt-3 text-sm leading-6 text-slate-600">
-                Your rider account has been created successfully.
-                Your account is currently pending verification.
-                You can sign in after an Owner activates your account.
+                Your Rider account has been created and activated successfully.
+                You can now sign in using your Rider credentials.
+                Complete your onboarding before starting delivery operations.
               </p>
 
               {invitation && (
@@ -169,11 +176,13 @@ export default function RiderInvitationPage({ params }: PageProps) {
                 </div>
               )}
 
-              <div className="mt-6 flex items-center justify-center gap-2 rounded-lg bg-amber-50 p-3 text-left text-sm text-amber-800">
-                <ShieldCheck className="h-5 w-5 shrink-0" />
-                <span>
-                  Your account must be activated by an Owner before login.
-                </span>
+              <div className="mt-6 rounded-lg border border-blue-200 bg-blue-50 p-4 text-left text-sm text-blue-800">
+                <ShieldCheck className="mb-2 h-5 w-5" />
+                <strong>Next step: Complete your onboarding</strong>
+                <p className="mt-1">
+                  Your delivery and availability features will remain restricted
+                  until all required onboarding steps are completed.
+                </p>
               </div>
 
               <Link
@@ -384,8 +393,9 @@ export default function RiderInvitationPage({ params }: PageProps) {
 
               <p className="mt-5 text-center text-xs leading-5 text-slate-500">
                 By accepting this invitation, you agree to create a separate
-                NOPTRIX Rider account. Your account requires Owner activation
-                before you can log in.
+                NOPTRIX Rider account. Your account will be activated after
+                successful acceptance. Delivery operations require completed
+                onboarding.
               </p>
             </>
           ) : null}

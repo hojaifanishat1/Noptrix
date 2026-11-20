@@ -3,6 +3,12 @@ import { Types } from "mongoose";
 import { ApiError } from "../../utils/ApiError";
 import { getSettingsByCategory } from "../settings/settings.service";
 import { createSellerInvitation } from "../seller-invitations/seller-invitation.service";
+import {
+  SellerOpportunity,
+  ISellerOpportunity,
+  SELLER_OPPORTUNITY_STATUSES,
+  SELLER_OPPORTUNITY_VISIBILITIES,
+} from "../seller-opportunities/seller-opportunity.model";
 
 import {
   SellerApplication,
@@ -33,7 +39,7 @@ const APPLICATION_STATUS_TRANSITIONS: Record<
   SellerApplicationStatus,
   readonly SellerApplicationStatus[]
 > = {
-  SUBMITTED: ["UNDER_REVIEW", "REJECTED", "WITHDRAWN"],
+  SUBMITTED: ["UNDER_REVIEW", "APPROVED", "REJECTED", "WITHDRAWN"],
 
   UNDER_REVIEW: ["APPROVED", "REJECTED", "WITHDRAWN"],
 
@@ -97,19 +103,173 @@ export const createSellerApplication = async (
 
   const email = normalizeEmail(input.email);
 
-  const existingActiveApplication = await SellerApplication.findOne({
-    applicantId: applicantObjectId,
-    status: {
-      $in: ACTIVE_APPLICATION_STATUSES,
-    },
-  });
+  let opportunity: ISellerOpportunity | null = null;
 
-  if (existingActiveApplication) {
-    throw ApiError.conflict("You already have an active seller application.");
+  if (input.opportunityId) {
+    opportunity = await SellerOpportunity.findOne({
+      _id: validateObjectId(input.opportunityId, "opportunityId"),
+      status: SELLER_OPPORTUNITY_STATUSES.PUBLISHED,
+      visibility: SELLER_OPPORTUNITY_VISIBILITIES.PUBLIC,
+      $or: [
+        { applicationDeadline: { $exists: false } },
+        { applicationDeadline: null },
+        { applicationDeadline: { $gt: new Date() } },
+      ],
+    });
+
+    if (!opportunity) {
+      throw ApiError.badRequest(
+        "This seller opportunity is not accepting applications.",
+        { code: "SELLER_OPPORTUNITY_NOT_OPEN" },
+      );
+    }
+
+    const fields = opportunity.applicationForm ?? [];
+    const responses = input.formResponses ?? {};
+    const allowedKeys = new Set(fields.map((field) => field.key));
+
+    for (const key of Object.keys(responses)) {
+      if (!allowedKeys.has(key)) {
+        throw ApiError.badRequest(`Unknown application form field: ${key}.`);
+      }
+    }
+
+    for (const field of fields) {
+      const value = responses[field.key];
+      const isEmpty =
+        value === undefined ||
+        value === null ||
+        value === "" ||
+        (Array.isArray(value) && value.length === 0);
+
+      if (field.required && isEmpty) {
+        throw ApiError.badRequest(`${field.label} is required.`);
+      }
+
+      if (isEmpty) continue;
+
+      if (field.type === "SELECT") {
+        if (
+          typeof value !== "string" ||
+          !field.options?.includes(value)
+        ) {
+          throw ApiError.badRequest(`Invalid selection for ${field.label}.`);
+        }
+      }
+
+      if (field.type === "MULTI_SELECT") {
+        if (
+          !Array.isArray(value) ||
+          value.some(
+            (item) =>
+              typeof item !== "string" ||
+              !field.options?.includes(item),
+          )
+        ) {
+          throw ApiError.badRequest(`Invalid selection for ${field.label}.`);
+        }
+      }
+
+      if (
+        field.type === "CHECKBOX" &&
+        typeof value !== "boolean"
+      ) {
+        throw ApiError.badRequest(`${field.label} must be true or false.`);
+      }
+
+      if (
+        ["TEXT", "TEXTAREA", "EMAIL", "PHONE", "URL", "DATE"].includes(field.type) &&
+        typeof value !== "string"
+      ) {
+        throw ApiError.badRequest(`${field.label} must be text.`);
+      }
+
+      if (field.type === "NUMBER" && typeof value !== "number") {
+        throw ApiError.badRequest(`${field.label} must be a number.`);
+      }
+
+      if (
+        field.maxLength &&
+        typeof value === "string" &&
+        value.length > field.maxLength
+      ) {
+        throw ApiError.badRequest(`${field.label} exceeds its maximum length.`);
+      }
+    }
+
+    const uploadedDocuments = input.documents ?? [];
+    const requiredDocuments = opportunity.requiredDocuments ?? [];
+
+    for (const requirement of requiredDocuments) {
+      if (
+        requirement.required &&
+        !uploadedDocuments.some((document) => document.key === requirement.key)
+      ) {
+        throw ApiError.badRequest(`${requirement.label} is required.`);
+      }
+    }
+
+    for (const document of uploadedDocuments) {
+      const requirement = requiredDocuments.find(
+        (item) => item.key === document.key,
+      );
+
+      if (!requirement) {
+        throw ApiError.badRequest(
+          `Unknown document requirement: ${document.key}.`,
+        );
+      }
+
+      if (
+        requirement.acceptedMimeTypes.length > 0 &&
+        !requirement.acceptedMimeTypes.includes(document.mimeType)
+      ) {
+        throw ApiError.badRequest(
+          `Invalid file type for ${requirement.label}.`,
+        );
+      }
+
+      if (
+        document.sizeBytes > requirement.maxSizeMB * 1024 * 1024
+      ) {
+        throw ApiError.badRequest(
+          `${requirement.label} exceeds the maximum file size.`,
+        );
+      }
+    }
+
+    const duplicateOpportunityApplication = await SellerApplication.findOne({
+      applicantId: applicantObjectId,
+      opportunityId: opportunity._id,
+    });
+
+    if (duplicateOpportunityApplication) {
+      throw ApiError.conflict(
+        "You have already applied to this seller opportunity.",
+      );
+    }
+  } else {
+    const existingActiveApplication = await SellerApplication.findOne({
+      applicantId: applicantObjectId,
+      status: {
+        $in: ACTIVE_APPLICATION_STATUSES,
+      },
+      opportunityId: { $exists: false },
+    });
+
+    if (existingActiveApplication) {
+      throw ApiError.conflict("You already have an active seller application.");
+    }
   }
 
   const application = await SellerApplication.create({
     applicantId: applicantObjectId,
+
+    opportunityId: opportunity?._id,
+
+    formResponses: input.formResponses ?? {},
+
+    documents: input.documents ?? [],
 
     businessName: input.businessName,
 
@@ -156,7 +316,8 @@ export const getSellerApplicationById = async (
 
   const application = await SellerApplication.findById(applicationObjectId)
     .populate("applicantId", "name email phone status")
-    .populate("reviewedBy", "name email");
+    .populate("reviewedBy", "name email")
+    .populate("opportunityId", "title slug category status");
 
   if (!application) {
     throw ApiError.notFound("Seller application not found.");
@@ -191,6 +352,13 @@ export const getMySellerApplications = async (
     filter.status = query.status;
   }
 
+  if (query.opportunityId) {
+    filter.opportunityId = validateObjectId(
+      query.opportunityId,
+      "opportunityId",
+    );
+  }
+
   if (query.type) {
     filter.type = query.type;
   }
@@ -223,7 +391,8 @@ export const getMySellerApplications = async (
       })
       .skip(skip)
       .limit(limit)
-      .populate("reviewedBy", "name email"),
+      .populate("reviewedBy", "name email")
+      .populate("opportunityId", "title slug category status"),
 
     SellerApplication.countDocuments(filter),
   ]);
@@ -275,6 +444,13 @@ export const getAllSellerApplications = async (
     filter.applicantId = validateObjectId(query.applicantId, "applicantId");
   }
 
+  if (query.opportunityId) {
+    filter.opportunityId = validateObjectId(
+      query.opportunityId,
+      "opportunityId",
+    );
+  }
+
   if (query.search) {
     const search = query.search.trim();
 
@@ -304,7 +480,8 @@ export const getAllSellerApplications = async (
       .skip(skip)
       .limit(limit)
       .populate("applicantId", "name email phone status")
-      .populate("reviewedBy", "name email"),
+      .populate("reviewedBy", "name email")
+      .populate("opportunityId", "title slug category status"),
 
     SellerApplication.countDocuments(filter),
   ]);

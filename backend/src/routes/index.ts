@@ -26,6 +26,7 @@ import productRoutes from "../modules/products/product.routes";
 import searchRoutes from "../modules/search/search.routes";
 import subcategoryRoutes from "../modules/subcategories/subcategory.routes";
 import sellerApplicationRoutes from "../modules/seller-applications/seller-application.routes";
+import sellerOpportunityRoutes from "../modules/seller-opportunities/seller-opportunity.routes";
 import sellerInvitationRoutes from "../modules/seller-invitations/seller-invitation.routes";
 import sellerRoutes from "../modules/sellers/seller.routes";
 import onboardingRoutes from "../modules/onboarding/onboarding.routes";
@@ -253,6 +254,8 @@ router.use("/sellers", sellerRoutes);
 router.use("/onboarding", onboardingRoutes);
 
 router.use("/seller-products", sellerProductRoutes);
+
+router.use("/seller-opportunities", sellerOpportunityRoutes);
 
 router.use("/seller-applications", sellerApplicationRoutes);
 

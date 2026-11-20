@@ -71,7 +71,8 @@ export interface AcceptedRiderInvitation {
   riderId: string;
   riderCode: string;
   email: string;
-  status: "PENDING";
+  status: "ACTIVE";
+  onboardingStatus: "IN_PROGRESS";
   message?: string;
 }
 

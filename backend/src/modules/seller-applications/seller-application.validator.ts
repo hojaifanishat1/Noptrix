@@ -24,7 +24,21 @@ const sellerApplicationStatuses = [
 |--------------------------------------------------------------------------
 */
 
+const sellerApplicationDocumentSchema = z.object({
+  key: z.string().trim().min(2).max(60),
+  fileName: z.string().trim().min(1).max(255),
+  fileUrl: z.string().trim().url().max(2000),
+  mimeType: z.string().trim().min(1).max(150),
+  sizeBytes: z.number().int().min(1),
+});
+
 export const createSellerApplicationSchema = z.object({
+  opportunityId: objectIdSchema.optional(),
+
+  formResponses: z.record(z.string(), z.unknown()).optional(),
+
+  documents: z.array(sellerApplicationDocumentSchema).max(30).optional(),
+
   businessName: z.string().trim().min(2).max(200),
 
   legalName: z.string().trim().max(200).optional(),
@@ -130,6 +144,8 @@ export const sellerApplicationQuerySchema = z.object({
   type: z.enum(sellerTypes).optional(),
 
   applicantId: objectIdSchema.optional(),
+
+  opportunityId: objectIdSchema.optional(),
 
   search: z.string().trim().max(100).optional(),
 });

@@ -146,7 +146,7 @@ export const createSellerInvitation = async (
         "",
         `This invitation expires on ${formattedExpiry} (UTC).`,
         "",
-        "Your Seller account will remain pending until Owner verification.",
+        "Your Seller account becomes ACTIVE after accepting this invitation and creating your password. Selling access remains gated until required onboarding is complete.",
         "",
         "You do not need an existing customer account.",
       ].join("\n"),
@@ -317,4 +317,183 @@ export const acceptSellerInvitation = async (
     status: seller.status,
     onboardingStatus: seller.onboardingStatus,
   };
+};
+
+/*
+|--------------------------------------------------------------------------
+| ADMIN: LIST SELLER INVITATIONS
+|--------------------------------------------------------------------------
+*/
+
+import type { z } from "zod";
+import type { sellerInvitationAdminQuerySchema } from "./seller-invitation.validator";
+
+type SellerInvitationAdminQuery = z.infer<
+  typeof sellerInvitationAdminQuerySchema
+>;
+
+const escapeRegex = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export const getAllSellerInvitations = async (
+  query: SellerInvitationAdminQuery,
+) => {
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 20;
+  const skip = (page - 1) * limit;
+  const now = new Date();
+
+  // Persist expired pending invitations before listing.
+  await SellerInvitation.updateMany(
+    {
+      status: "PENDING",
+      expiresAt: { $lte: now },
+    },
+    {
+      $set: { status: "EXPIRED" },
+    },
+  );
+
+  const filter: Record<string, unknown> = {};
+
+  if (query.status) {
+    filter.status = query.status;
+  }
+
+  if (query.search?.trim()) {
+    const regex = new RegExp(escapeRegex(query.search.trim()), "i");
+
+    const matchingApplications = await SellerApplication.find({
+      $or: [
+        { businessName: regex },
+        { legalName: regex },
+      ],
+    })
+      .select("_id")
+      .lean();
+
+    filter.$or = [
+      { email: regex },
+      {
+        applicationId: {
+          $in: matchingApplications.map((item) => item._id),
+        },
+      },
+    ];
+  }
+
+  const [invitations, total, statusCounts] = await Promise.all([
+    SellerInvitation.find(filter)
+      .select("-tokenHash")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate({
+        path: "applicationId",
+        select: "businessName legalName type status city country",
+      })
+      .populate({
+        path: "acceptedSellerId",
+        select: "sellerCode businessName email status onboardingStatus",
+      })
+      .populate({
+        path: "createdBy",
+        select: "name email",
+      })
+      .lean(),
+
+    SellerInvitation.countDocuments(filter),
+
+    SellerInvitation.aggregate([
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+        },
+      },
+    ]),
+  ]);
+
+  const counts = {
+    total: statusCounts.reduce(
+      (sum, item) => sum + item.count,
+      0,
+    ),
+    pending: 0,
+    accepted: 0,
+    expired: 0,
+    revoked: 0,
+  };
+
+  for (const item of statusCounts) {
+    if (item._id === "PENDING") counts.pending = item.count;
+    if (item._id === "ACCEPTED") counts.accepted = item.count;
+    if (item._id === "EXPIRED") counts.expired = item.count;
+    if (item._id === "REVOKED") counts.revoked = item.count;
+  }
+
+  const totalPages = Math.ceil(total / limit);
+
+  return {
+    invitations,
+    counts,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPreviousPage: page > 1,
+    },
+  };
+};
+
+/*
+|--------------------------------------------------------------------------
+| ADMIN: REVOKE SELLER INVITATION
+|--------------------------------------------------------------------------
+*/
+
+export const revokeSellerInvitation = async (
+  invitationId: string,
+): Promise<void> => {
+  if (!Types.ObjectId.isValid(invitationId)) {
+    throw ApiError.badRequest("Invalid invitation ID.");
+  }
+
+  const invitation = await SellerInvitation.findById(invitationId);
+
+  if (!invitation) {
+    throw ApiError.notFound("Seller invitation not found.");
+  }
+
+  if (invitation.status === "ACCEPTED") {
+    throw ApiError.badRequest(
+      "An accepted seller invitation cannot be revoked.",
+    );
+  }
+
+  if (invitation.status === "REVOKED") {
+    throw ApiError.badRequest(
+      "This seller invitation has already been revoked.",
+    );
+  }
+
+  if (invitation.expiresAt <= new Date()) {
+    invitation.status = "EXPIRED";
+    await invitation.save();
+
+    throw ApiError.badRequest(
+      "This seller invitation has expired and cannot be revoked.",
+    );
+  }
+
+  if (invitation.status !== "PENDING") {
+    throw ApiError.badRequest(
+      "Only pending seller invitations can be revoked.",
+    );
+  }
+
+  invitation.status = "REVOKED";
+  await invitation.save();
 };

@@ -7,6 +7,10 @@ import {
 
 import { riderAuth } from "../../middlewares/riderAuth.middleware";
 
+import {
+  requireRiderOnboardingCompleted,
+} from "../onboarding/require-rider-onboarding.middleware";
+
 import { validate } from "../../middlewares/validation.middleware";
 
 import {
@@ -41,6 +45,7 @@ const router = Router();
 router.patch(
   "/:trackingId/location",
   riderAuth,
+  requireRiderOnboardingCompleted,
   validate(trackingIdParamSchema, "params"),
   validate(updateTrackingLocationSchema, "body"),
   updateMyTrackingLocationController,

@@ -1,11 +1,17 @@
-import { Router } from "express";
+
+import { Router, RequestHandler } from "express";
 
 import { userAuth } from "../../middlewares/userAuth.middleware";
 
 import {
-  ownerAuth,
-  ownerSecretVerified,
-} from "../../middlewares/ownerAuth.middleware";
+  ownerOrAdminAuth,
+  ownerOrAdminSecretVerified,
+} from "../../middlewares/ownerOrAdminAuth.middleware";
+
+import {
+  loadAuthenticatedPermissions,
+  requirePermission,
+} from "../../middlewares/permission.middleware";
 
 import { validate } from "../../middlewares/validation.middleware";
 
@@ -34,7 +40,7 @@ const router = Router();
 
 /*
 |--------------------------------------------------------------------------
-| USER
+| CUSTOMER ROUTES
 |--------------------------------------------------------------------------
 */
 
@@ -76,44 +82,100 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
-| OWNER
+| OWNER / ADMIN ROUTES
 |--------------------------------------------------------------------------
 */
 
-const ownerOnly = [ownerAuth, ownerSecretVerified];
+const administrativeAccess = [
+  ownerOrAdminAuth,
+  ownerOrAdminSecretVerified,
+  loadAuthenticatedPermissions,
+];
+
+/*
+ * Status changes require different permissions:
+ * APPROVED      -> seller_applications.approve
+ * REJECTED      -> seller_applications.reject
+ * Other changes -> seller_applications.update
+ */
+const requireSellerApplicationStatusPermission: RequestHandler = (
+  req,
+  res,
+  next,
+) => {
+  const status = req.body?.status;
+
+  const permission =
+    status === "APPROVED"
+      ? "seller_applications.approve"
+      : status === "REJECTED"
+        ? "seller_applications.reject"
+        : "seller_applications.update";
+
+  requirePermission(permission)(req, res, next);
+};
+
+/*
+|--------------------------------------------------------------------------
+| READ
+|--------------------------------------------------------------------------
+*/
 
 router.get(
   "/",
-  ...ownerOnly,
+  ...administrativeAccess,
+  requirePermission("seller_applications.read"),
   validate(sellerApplicationQuerySchema, "query"),
   getAllSellerApplicationsController,
 );
 
 router.get(
   "/:applicationId",
-  ...ownerOnly,
+  ...administrativeAccess,
+  requirePermission("seller_applications.read"),
   validate(sellerApplicationIdParamSchema, "params"),
   getSellerApplicationController,
 );
 
+/*
+|--------------------------------------------------------------------------
+| UPDATE / APPROVE / REJECT
+|--------------------------------------------------------------------------
+*/
+
 router.patch(
   "/:applicationId/status",
-  ...ownerOnly,
+  ...administrativeAccess,
   validate(sellerApplicationIdParamSchema, "params"),
   validate(updateSellerApplicationStatusSchema, "body"),
+  requireSellerApplicationStatusPermission,
   updateSellerApplicationStatusController,
 );
 
+/*
+|--------------------------------------------------------------------------
+| DELETE
+|--------------------------------------------------------------------------
+*/
+
 router.delete(
   "/:applicationId",
-  ...ownerOnly,
+  ...administrativeAccess,
+  requirePermission("seller_applications.delete"),
   validate(sellerApplicationIdParamSchema, "params"),
   deleteSellerApplicationController,
 );
 
+/*
+|--------------------------------------------------------------------------
+| RESEND INVITATION
+|--------------------------------------------------------------------------
+*/
+
 router.post(
   "/:applicationId/resend-invitation",
-  ...ownerOnly,
+  ...administrativeAccess,
+  requirePermission("seller_applications.invite"),
   validate(sellerApplicationIdParamSchema, "params"),
   resendSellerApplicationInvitationController,
 );

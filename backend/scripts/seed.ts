@@ -245,7 +245,26 @@ const permissions = [
   ["rider_payouts", "read", "rider_payouts.read"],
   ["riders", "read", "riders.read"],
   ["riders", "verify", "riders.verify"],
+
+  /*
+    |--------------------------------------------------------------------------
+    | Seller Application Management
+    |--------------------------------------------------------------------------
+    */
+
   ["seller_applications", "read", "seller_applications.read"],
+  ["seller_applications", "update", "seller_applications.update"],
+  ["seller_applications", "approve", "seller_applications.approve"],
+  ["seller_applications", "reject", "seller_applications.reject"],
+  ["seller_applications", "delete", "seller_applications.delete"],
+  ["seller_applications", "invite", "seller_applications.invite"],
+  ["seller_opportunities", "read", "seller_opportunities.read"],
+  ["seller_opportunities", "create", "seller_opportunities.create"],
+  ["seller_opportunities", "update", "seller_opportunities.update"],
+  ["seller_opportunities", "publish", "seller_opportunities.publish"],
+  ["seller_opportunities", "close", "seller_opportunities.close"],
+  ["seller_opportunities", "delete", "seller_opportunities.delete"],
+
   ["seller_orders", "read", "seller_orders.read"],
   ["seller_payouts", "read", "seller_payouts.read"],
   ["seller_products", "read", "seller_products.read"],

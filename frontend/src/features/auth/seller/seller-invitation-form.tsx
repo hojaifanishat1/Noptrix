@@ -93,11 +93,14 @@ export default function SellerInvitationForm({
         confirmPassword,
       });
 
-      if (result.status !== "PENDING") {
-        throw new Error("Unexpected seller account status.");
+      if (
+        result.status !== "ACTIVE" ||
+        result.onboardingStatus !== "IN_PROGRESS"
+      ) {
+        throw new Error("Seller account activation could not be verified.");
       }
 
-      router.replace("/seller/pending-verification");
+      router.replace("/seller/login?invitation=accepted");
     } catch (acceptError: unknown) {
       setError(
         acceptError instanceof Error

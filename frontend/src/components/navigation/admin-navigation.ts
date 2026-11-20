@@ -371,6 +371,21 @@ export const ADMIN_NAVIGATION_SECTIONS: readonly AdminNavigationSection[] = [
         badgeKey: "sellerApplications",
       },
       {
+        id: "seller-invitations",
+        label: "Seller Invitations",
+        href: "/admin/seller-invitations",
+        icon: Mail,
+        permission: "seller_applications.read",
+      },
+
+      {
+        id: "seller-opportunities",
+        label: "Seller Opportunities",
+        href: "/admin/seller-opportunities",
+        icon: BriefcaseBusiness,
+        permission: "seller_opportunities.read",
+      },
+      {
         id: "seller-verification",
         label: "Seller Verification",
         href: "/admin/sellers/verification",

@@ -122,3 +122,23 @@ export const ownerOrAdminAuth: RequestHandler = (
     return;
   }
 };
+
+export const ownerOrAdminSecretVerified: RequestHandler = (
+  req,
+  res,
+  next,
+): void => {
+  const isVerified =
+    req.ownerAuth?.secretVerified === true ||
+    req.adminAuth?.secretVerified === true;
+
+  if (!isVerified) {
+    res.status(403).json({
+      success: false,
+      message: "Administrative secret verification is required.",
+    });
+    return;
+  }
+
+  next();
+};

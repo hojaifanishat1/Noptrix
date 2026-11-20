@@ -8,10 +8,23 @@ import { ApiError } from "../../utils/ApiError";
 
 import { getAuthenticatedUserId } from "../../middlewares/userAuth.middleware";
 
-import {
-  getAuthenticatedOwnerId,
-  getAuthenticatedOwnerUserId,
-} from "../../middlewares/ownerAuth.middleware";
+const getAdministrativeReviewerUserId = (req: Request): string => {
+  const ownerUserId = req.ownerAuth?.userId;
+
+  if (typeof ownerUserId === "string" && ownerUserId) {
+    return ownerUserId;
+  }
+
+  const adminUserId = req.adminAuth?.claims?.userId;
+
+  if (typeof adminUserId === "string" && adminUserId) {
+    return adminUserId;
+  }
+
+  throw ApiError.unauthorized(
+    "Administrative reviewer identity could not be resolved.",
+  );
+};
 
 import {
   CreateSellerApplicationInput,
@@ -97,7 +110,14 @@ export const getMySellerApplicationController = asyncHandler(
 
     const application = await getSellerApplicationById(applicationId);
 
-    if (application.applicantId.toString() !== userId) {
+    const applicantId =
+      typeof application.applicantId === "object" &&
+      application.applicantId !== null &&
+      "_id" in application.applicantId
+        ? String(application.applicantId._id)
+        : String(application.applicantId);
+
+    if (applicantId !== userId) {
       throw ApiError.forbidden(
         "You are not allowed to access this seller application.",
       );
@@ -183,8 +203,6 @@ export const withdrawSellerApplicationController = asyncHandler(
  */
 export const getAllSellerApplicationsController = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    getAuthenticatedOwnerId(req);
-
     const query = req.query as never as SellerApplicationQueryInput;
 
     const result = await getAllSellerApplications(query);
@@ -205,7 +223,7 @@ export const getAllSellerApplicationsController = asyncHandler(
  */
 export const getSellerApplicationController = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    getAuthenticatedOwnerId(req);
+
 
     const applicationId = req.params.applicationId;
 
@@ -231,8 +249,7 @@ export const getSellerApplicationController = asyncHandler(
  */
 export const updateSellerApplicationStatusController = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    getAuthenticatedOwnerId(req);
-    const reviewerUserId = getAuthenticatedOwnerUserId(req);
+    const reviewerUserId = getAdministrativeReviewerUserId(req);
 
     const applicationId = req.params.applicationId;
 
@@ -264,7 +281,7 @@ export const updateSellerApplicationStatusController = asyncHandler(
  */
 export const deleteSellerApplicationController = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    getAuthenticatedOwnerId(req);
+
 
     const applicationId = req.params.applicationId;
 
@@ -294,8 +311,7 @@ export const deleteSellerApplicationController = asyncHandler(
 
 export const resendSellerApplicationInvitationController = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    getAuthenticatedOwnerId(req);
-    const reviewerUserId = getAuthenticatedOwnerUserId(req);
+    const reviewerUserId = getAdministrativeReviewerUserId(req);
 
     const applicationId = req.params.applicationId;
 

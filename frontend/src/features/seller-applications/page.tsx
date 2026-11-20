@@ -110,6 +110,42 @@ function getApplicantName(
     : applicant?.name || applicant?.email || applicant?._id || "—";
 }
 
+function getOpportunityTitle(
+  opportunity: SellerApplication["opportunityId"],
+): string {
+  if (!opportunity) return "General application";
+
+  return typeof opportunity === "string"
+    ? "Opportunity application"
+    : opportunity.title || opportunity.slug || "Opportunity application";
+}
+
+function formatDocumentSize(sizeBytes: number): string {
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return "—";
+
+  if (sizeBytes < 1024 * 1024) {
+    return `${(sizeBytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(sizeBytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function formatFormResponse(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).join(", ");
+  }
+
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
+
+  return String(value);
+}
+
 function SummaryCard({
   title,
   value,
@@ -338,6 +374,15 @@ export default function AdminSellerApplicationsPage() {
       cell: (application: SellerApplication) => (
         <span className="text-sm text-muted-foreground">
           {application.type}
+        </span>
+      ),
+    },
+    {
+      key: "opportunity",
+      header: "Opportunity",
+      cell: (application: SellerApplication) => (
+        <span className="text-sm text-muted-foreground">
+          {getOpportunityTitle(application.opportunityId)}
         </span>
       ),
     },
@@ -700,6 +745,100 @@ export default function AdminSellerApplicationsPage() {
                   <DetailItem label="Submitted" value={formatDate(selected.createdAt)} />
                   <DetailItem label="Reviewed" value={formatDate(selected.reviewedAt)} />
                 </div>
+
+                <section className="rounded-xl border border-border p-4">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Seller Opportunity
+                  </h3>
+
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {getOpportunityTitle(selected.opportunityId)}
+                  </p>
+
+                  {selected.opportunityId &&
+                    typeof selected.opportunityId !== "string" &&
+                    selected.opportunityId.slug && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Slug: {selected.opportunityId.slug}
+                      </p>
+                    )}
+                </section>
+
+                {selected.formResponses &&
+                  Object.keys(selected.formResponses).length > 0 && (
+                    <section className="space-y-3">
+                      <div>
+                        <h3 className="text-sm font-semibold text-foreground">
+                          Application Form Responses
+                        </h3>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Answers submitted through the opportunity form.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {Object.entries(selected.formResponses).map(
+                          ([key, value]) => (
+                            <div
+                              key={key}
+                              className="min-w-0 rounded-lg border border-border bg-muted/30 p-3"
+                            >
+                              <p className="text-xs font-semibold text-muted-foreground">
+                                {key}
+                              </p>
+                              <p className="mt-1 break-words whitespace-pre-wrap text-sm text-foreground">
+                                {formatFormResponse(value)}
+                              </p>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    </section>
+                  )}
+
+                {selected.documents && selected.documents.length > 0 && (
+                  <section className="space-y-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">
+                        Submitted Documents
+                      </h3>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Documents attached to this application.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      {selected.documents.map((document, index) => (
+                        <div
+                          key={`${document.key}-${index}`}
+                          className="flex flex-col justify-between gap-3 rounded-lg border border-border p-3 sm:flex-row sm:items-center"
+                        >
+                          <div className="flex min-w-0 items-start gap-3">
+                            <FileText className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+
+                            <div className="min-w-0">
+                              <p className="break-words text-sm font-semibold text-foreground">
+                                {document.fileName}
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {document.key} · {document.mimeType} · {formatDocumentSize(document.sizeBytes)}
+                              </p>
+                            </div>
+                          </div>
+
+                          <a
+                            href={document.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted"
+                          >
+                            View document
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
 
                 {selected.description && (
                   <div>

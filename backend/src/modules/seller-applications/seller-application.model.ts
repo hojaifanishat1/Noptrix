@@ -16,6 +16,18 @@ import {
 export interface ISellerApplication extends Document {
   applicantId: Types.ObjectId;
 
+  opportunityId?: Types.ObjectId;
+
+  formResponses?: Record<string, unknown>;
+
+  documents?: {
+    key: string;
+    fileName: string;
+    fileUrl: string;
+    mimeType: string;
+    sizeBytes: number;
+  }[];
+
   businessName: string;
 
   legalName?: string;
@@ -76,6 +88,33 @@ const sellerApplicationSchema = new Schema<ISellerApplication>(
       ref: "User",
       required: true,
       index: true,
+    },
+
+    opportunityId: {
+      type: Schema.Types.ObjectId,
+      ref: "SellerOpportunity",
+      index: true,
+    },
+
+    formResponses: {
+      type: Schema.Types.Mixed,
+      default: {},
+    },
+
+    documents: {
+      type: [
+        new Schema(
+          {
+            key: { type: String, required: true, trim: true },
+            fileName: { type: String, required: true, trim: true, maxlength: 255 },
+            fileUrl: { type: String, required: true, trim: true, maxlength: 2000 },
+            mimeType: { type: String, required: true, trim: true, maxlength: 150 },
+            sizeBytes: { type: Number, required: true, min: 1 },
+          },
+          { _id: false },
+        ),
+      ],
+      default: [],
     },
 
     businessName: {
@@ -214,6 +253,23 @@ const sellerApplicationSchema = new Schema<ISellerApplication>(
 
 sellerApplicationSchema.index({
   applicantId: 1,
+  createdAt: -1,
+});
+
+sellerApplicationSchema.index(
+  { applicantId: 1, opportunityId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      opportunityId: { $type: "objectId" },
+    },
+    name: "seller_application_applicant_opportunity_unique",
+  },
+);
+
+sellerApplicationSchema.index({
+  opportunityId: 1,
+  status: 1,
   createdAt: -1,
 });
 

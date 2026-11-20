@@ -97,15 +97,25 @@ export default function SellerLoginForm() {
             Sign in to manage your NOPTRIX seller business.
           </p>
 
-          {(error || searchParams.get("status") === "pending") && (
+          {error && (
             <div
               role="alert"
-              className="mt-6 flex gap-3 rounded-xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-200"
+              className="mt-6 flex gap-3 rounded-xl border border-red-400/20 bg-red-400/10 p-4 text-sm text-red-200"
             >
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+              <p>{error}</p>
+            </div>
+          )}
+
+          {searchParams.get("invitation") === "accepted" && !error && (
+            <div
+              role="status"
+              className="mt-6 flex gap-3 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm text-emerald-200"
+            >
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
               <p>
-                {error ||
-                  "Your account is awaiting Owner verification. You can sign in after activation."}
+                Your invitation has been accepted and your seller account is
+                active. Sign in with your email and newly created password.
               </p>
             </div>
           )}

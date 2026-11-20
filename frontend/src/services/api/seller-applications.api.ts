@@ -33,6 +33,13 @@ export interface SellerApplication {
   address?: string;
   city?: string;
   country?: string;
+  opportunityId?: string | {
+    _id: string;
+    title?: string;
+    slug?: string;
+  };
+  formResponses?: Record<string, unknown>;
+  documents?: SellerApplicationDocumentInput[];
   status: SellerApplicationStatus;
   reviewedAt?: string;
   reviewedBy?: SellerApplicant;
@@ -81,6 +88,9 @@ export interface CreateSellerApplicationInput {
   address?: string;
   city?: string;
   country?: string;
+  opportunityId?: string;
+  formResponses?: Record<string, unknown>;
+  documents?: SellerApplicationDocumentInput[];
 }
 
 export interface UpdateSellerApplicationStatusInput {
@@ -181,3 +191,12 @@ export const sellerApplicationsApi = {
     );
   },
 };
+
+
+export interface SellerApplicationDocumentInput {
+  key: string;
+  fileName: string;
+  fileUrl: string;
+  mimeType: string;
+  sizeBytes: number;
+}

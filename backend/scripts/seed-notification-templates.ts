@@ -630,6 +630,32 @@ const templates: NotificationTemplateSeed[] = [
     */
 
   ...createChannelTemplates({
+    key: "seller.invitation.created",
+    name: "Seller Invitation Created",
+    description: "Sent when an approved seller applicant receives an invitation.",
+    event: "SELLER_INVITATION_CREATED",
+    variables: [
+      "sellerName",
+      "businessName",
+      "sellerType",
+      "companyName",
+      "invitationUrl",
+      "expiresAt",
+    ],
+    inAppTitle: "Your Seller invitation is ready",
+    inAppBody:
+      "{{companyName}} has approved {{businessName}}. Accept your invitation to create your Seller account.",
+    emailTitle: "Your {{companyName}} Seller invitation",
+    emailBody:
+      "Hello {{sellerName}},\\n\\nYour seller application has been approved.\\n\\nBusiness: {{businessName}}\\nSeller type: {{sellerType}}\\n\\nCreate your separate Seller account here: {{invitationUrl}}\\n\\nThis invitation expires on {{expiresAt}}.\\n\\nYour Seller account becomes ACTIVE after you accept the invitation and create your password. Selling access remains subject to completion of the required onboarding.",
+    pushTitle: "Seller invitation received",
+    pushBody:
+      "{{companyName}} invited you to create a Seller account for {{businessName}}.",
+    smsBody:
+      "Your {{companyName}} Seller invitation is ready. Accept here: {{invitationUrl}}",
+  }),
+
+  ...createChannelTemplates({
     key: "seller.approved",
     name: "Seller Approved",
     description: "Sent when a seller application is approved.",
@@ -865,11 +891,20 @@ export const getNotificationTemplateSeedOwnerId =
 
 export const seedNotificationTemplates = async (
   ownerUserId: Types.ObjectId,
+  onlyKeys?: readonly string[],
 ): Promise<void> => {
   let created = 0;
   let updated = 0;
 
-  for (const template of templates) {
+  const selectedTemplates = onlyKeys
+    ? templates.filter((template) => onlyKeys.includes(template.key))
+    : templates;
+
+  if (onlyKeys && selectedTemplates.length === 0) {
+    throw new Error("No matching notification templates were found.");
+  }
+
+  for (const template of selectedTemplates) {
     const existing = await NotificationTemplate.findOne({
       key: template.key,
       channel: template.channel,
@@ -919,5 +954,5 @@ export const seedNotificationTemplates = async (
 
   console.log(`Notification templates updated: ${updated}`);
 
-  console.log(`Notification templates processed: ${templates.length}`);
+  console.log(`Notification templates processed: ${selectedTemplates.length}`);
 };
