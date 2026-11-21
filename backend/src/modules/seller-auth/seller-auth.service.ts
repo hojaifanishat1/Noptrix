@@ -1,7 +1,17 @@
 import bcrypt from "bcryptjs";
 import { Types } from "mongoose";
+import { createHash, randomBytes } from "crypto";
 
 import { ApiError } from "../../utils/ApiError";
+import { logger } from "../../utils/logger";
+import {
+  createOtp,
+  assertOtpCanBeResent,
+  assertOtpAttemptsAvailable,
+  verifyOtp,
+  deliverOtp,
+} from "../../services/otp.service";
+import { SellerLoginChallenge } from "./seller-login-challenge.model";
 import {
   generateTokenPair,
   verifyRefreshToken,
@@ -21,6 +31,8 @@ import type { SellerLoginInput } from "./seller-auth.validator";
 import type {
   SellerLoginResult,
   SellerRefreshResult,
+  SellerLoginChallengeResult,
+  SellerLoginResponse,
 } from "./seller-auth.types";
 
 const SALT_ROUNDS = 12;
@@ -105,14 +117,141 @@ const createSellerTokensAndSession = async (
   };
 };
 
+
+const hashSellerChallengeId = (value: string): string =>
+  createHash("sha256").update(value).digest("hex");
+
+const createSellerChallengeId = (): string =>
+  randomBytes(32).toString("hex");
+
+const sendSellerLoginOtp = async (
+  seller: {
+    email?: string;
+    phone?: string;
+    name?: string;
+  },
+  code: string,
+): Promise<void> => {
+  const tasks: Promise<{ delivered: boolean }>[] = [];
+
+  if (seller.email) {
+    tasks.push(
+      deliverOtp({
+        channel: "EMAIL",
+        destination: seller.email,
+        code,
+        purpose: "LOGIN_VERIFICATION",
+        subject: "Your NOPTRIX seller login code",
+        recipientName: "Seller",
+      }),
+    );
+  }
+
+  if (seller.phone) {
+    tasks.push(
+      deliverOtp({
+        channel: "SMS",
+        destination: seller.phone,
+        code,
+        purpose: "LOGIN_VERIFICATION",
+        subject: "NOPTRIX Seller Login",
+        recipientName: "Seller",
+      }),
+    );
+  }
+
+  if (!tasks.length) {
+    throw ApiError.badRequest(
+      "Seller must have a registered email or phone for login verification.",
+    );
+  }
+
+  const results = await Promise.allSettled(tasks);
+
+  results.forEach((result) => {
+    if (result.status !== "rejected") return;
+
+    logger.error(
+      { error: result.reason },
+      "Seller login OTP delivery failed.",
+    );
+  });
+
+  const delivered = results.some(
+    (result) =>
+      result.status === "fulfilled" && result.value.delivered,
+  );
+
+  if (!delivered) {
+    throw ApiError.internal(
+      "Seller login verification code could not be delivered.",
+    );
+  }
+};
+
+export const issueSellerLoginChallenge = async (
+  seller: {
+    _id: Types.ObjectId;
+    email?: string;
+    phone?: string;
+    name?: string;
+  },
+): Promise<SellerLoginChallengeResult> => {
+  if (!seller.email && !seller.phone) {
+    throw ApiError.badRequest(
+      "Seller must have a registered email or phone for login verification.",
+    );
+  }
+
+  await SellerLoginChallenge.updateMany(
+    {
+      sellerId: seller._id,
+      status: "PENDING",
+    },
+    {
+      $set: { status: "LOCKED" },
+    },
+  );
+
+  const otp = createOtp();
+  const challengeId = createSellerChallengeId();
+
+  const challenge = await SellerLoginChallenge.create({
+    sellerId: seller._id,
+    codeHash: otp.hash,
+    challengeIdHash: hashSellerChallengeId(challengeId),
+    status: "PENDING",
+    attempts: 0,
+    maxAttempts: otp.maxAttempts,
+    expiresAt: otp.expiresAt,
+    resendAvailableAt: otp.resendAvailableAt,
+  });
+
+  try {
+    await sendSellerLoginOtp(seller, otp.code);
+  } catch (error) {
+    await SellerLoginChallenge.deleteOne({ _id: challenge._id });
+    throw error;
+  }
+
+  return {
+    verificationRequired: true,
+    challengeId,
+    email: seller.email,
+    phone: seller.phone,
+    expiresAt: otp.expiresAt,
+    resendAvailableAt: otp.resendAvailableAt,
+  };
+};
+
 export const loginSeller = async (
   input: SellerLoginInput,
-  metadata?: {
+  _metadata?: {
     userAgent?: string;
     ipAddress?: string;
     deviceId?: string;
   },
-): Promise<SellerLoginResult> => {
+): Promise<SellerLoginResponse> => {
   const seller = await findSellerForLogin(input);
 
   if (!seller) {
@@ -150,6 +289,96 @@ export const loginSeller = async (
 
   seller.failedLoginAttempts = 0;
   seller.lockUntil = undefined;
+  await seller.save();
+
+  return issueSellerLoginChallenge({
+    _id: seller._id as Types.ObjectId,
+    email: seller.email || undefined,
+    phone: seller.phone || undefined,
+  });
+};
+
+export const verifySellerLoginChallenge = async (
+  challengeId: string,
+  code: string,
+  metadata?: {
+    userAgent?: string;
+    ipAddress?: string;
+    deviceId?: string;
+  },
+): Promise<SellerLoginResult> => {
+  const challenge = await SellerLoginChallenge.findOne({
+    challengeIdHash: hashSellerChallengeId(challengeId),
+    status: "PENDING",
+  })
+    .select("+codeHash +challengeIdHash")
+    .exec();
+
+  if (!challenge) {
+    throw ApiError.badRequest(
+      "Invalid or expired login verification challenge.",
+    );
+  }
+
+  if (challenge.expiresAt.getTime() <= Date.now()) {
+    challenge.status = "LOCKED";
+    await challenge.save();
+    throw ApiError.badRequest("The login verification code has expired.");
+  }
+
+  assertOtpAttemptsAvailable(challenge.attempts);
+
+  const result = verifyOtp({
+    code,
+    expectedHash: challenge.codeHash,
+    expiresAt: challenge.expiresAt,
+    attemptsUsed: challenge.attempts,
+  });
+
+  if (!result.valid) {
+    challenge.attempts += 1;
+
+    if (
+      result.attemptsExceeded ||
+      challenge.attempts >= challenge.maxAttempts
+    ) {
+      challenge.status = "LOCKED";
+    }
+
+    await challenge.save();
+    throw ApiError.badRequest("Invalid login verification code.");
+  }
+
+  const consumed = await SellerLoginChallenge.findOneAndUpdate(
+    {
+      _id: challenge._id,
+      status: "PENDING",
+      attempts: challenge.attempts,
+      expiresAt: { $gt: new Date() },
+    },
+    {
+      $set: {
+        status: "VERIFIED",
+        verifiedAt: new Date(),
+      },
+    },
+    { new: true },
+  );
+
+  if (!consumed) {
+    throw ApiError.badRequest(
+      "This login verification challenge has already been used or expired.",
+    );
+  }
+
+  const seller = await Seller.findById(challenge.sellerId).exec();
+
+  if (!seller || seller.status !== "ACTIVE") {
+    throw ApiError.forbidden("Seller account is not active.", {
+      code: "SELLER_ACCOUNT_INACTIVE",
+    });
+  }
+
   seller.lastLoginAt = new Date();
   await seller.save();
 
@@ -157,6 +386,90 @@ export const loginSeller = async (
     seller._id as Types.ObjectId,
     metadata,
   );
+};
+
+export const resendSellerLoginChallenge = async (
+  challengeId: string,
+): Promise<SellerLoginChallengeResult> => {
+  const challenge = await SellerLoginChallenge.findOne({
+    challengeIdHash: hashSellerChallengeId(challengeId),
+    status: "PENDING",
+  })
+    .select("+codeHash +challengeIdHash")
+    .exec();
+
+  if (!challenge) {
+    throw ApiError.badRequest(
+      "Invalid or expired login verification challenge.",
+    );
+  }
+
+  if (challenge.expiresAt.getTime() <= Date.now()) {
+    challenge.status = "LOCKED";
+    await challenge.save();
+    throw ApiError.badRequest("The login verification challenge has expired.");
+  }
+
+  assertOtpCanBeResent(challenge.resendAvailableAt);
+
+  const seller = await Seller.findById(challenge.sellerId).exec();
+
+  if (!seller || seller.status !== "ACTIVE") {
+    throw ApiError.unauthorized("Seller account is not active.");
+  }
+
+  const email = seller.email || undefined;
+  const phone = seller.phone || undefined;
+
+  if (!email && !phone) {
+    throw ApiError.badRequest(
+      "Seller must have a registered email or phone.",
+    );
+  }
+
+  const otp = createOtp();
+
+  await sendSellerLoginOtp(
+    {
+      email,
+      phone,
+      },
+    otp.code,
+  );
+
+  const updated = await SellerLoginChallenge.findOneAndUpdate(
+    {
+      _id: challenge._id,
+      status: "PENDING",
+      resendAvailableAt: { $lte: new Date() },
+    },
+    {
+      $set: {
+        codeHash: otp.hash,
+        attempts: 0,
+        maxAttempts: otp.maxAttempts,
+        expiresAt: otp.expiresAt,
+        resendAvailableAt: otp.resendAvailableAt,
+      },
+    },
+    { new: true },
+  );
+
+  if (!updated) {
+    throw ApiError.tooManyRequests(
+      "A new login code was already requested. Please try again later.",
+      { code: "OTP_RESEND_COOLDOWN" },
+    );
+  }
+
+  return {
+    verificationRequired: true,
+    challengeId,
+    email,
+    phone,
+    expiresAt: otp.expiresAt,
+    resendAvailableAt: otp.resendAvailableAt,
+  };
 };
 
 export const refreshSellerToken = async (

@@ -9,8 +9,18 @@ import {
 } from "@/lib/auth/seller-auth-storage";
 
 export interface SellerLoginInput {
-  email: string;
+  email?: string;
+  phone?: string;
   password: string;
+}
+
+export interface SellerLoginChallenge {
+  verificationRequired: true;
+  challengeId: string;
+  email?: string;
+  phone?: string;
+  expiresAt: string;
+  resendAvailableAt: string;
 }
 
 export interface SellerTokenResponse {
@@ -21,23 +31,42 @@ export interface SellerTokenResponse {
 }
 
 export const sellerAuthApi = {
-  async login(input: SellerLoginInput): Promise<SellerTokenResponse> {
+  async login(input: SellerLoginInput): Promise<SellerLoginChallenge> {
+    const response = await sellerAuthClient.post<
+      ApiResponse<SellerLoginChallenge>
+    >("/seller-auth/login", input);
+
+    return response.data.data;
+  },
+
+  async verifyLogin(input: {
+    challengeId: string;
+    code: string;
+  }): Promise<SellerTokenResponse> {
     const response = await sellerAuthClient.post<
       ApiResponse<SellerTokenResponse>
-    >("/seller-auth/login", input);
+    >("/seller-auth/verify-login", input);
 
     const result = response.data.data;
 
     sellerTokenStorage.set(result.accessToken);
-
     sellerAuthStorage.setRefreshToken(result.refreshToken);
-
     sellerAuthStorage.setSession({
       sellerId: result.sellerId,
       sessionId: result.sessionId,
     });
 
     return result;
+  },
+
+  async resendLoginCode(
+    challengeId: string,
+  ): Promise<SellerLoginChallenge> {
+    const response = await sellerAuthClient.post<
+      ApiResponse<SellerLoginChallenge>
+    >("/seller-auth/resend-login-code", { challengeId });
+
+    return response.data.data;
   },
 
   async getMe(): Promise<Seller> {

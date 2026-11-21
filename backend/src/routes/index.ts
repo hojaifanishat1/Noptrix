@@ -59,6 +59,7 @@ import { activityLogsRoutes } from "../modules/activity-logs/activity-log.routes
 import { systemLogsRoutes } from "../modules/system-logs/system-log.routes";
 import { integrationsRoutes } from "../modules/integrations/integration.routes";
 import { healthRoutes } from "../modules/health/health.routes";
+import systemMonitoringRoutes from "../modules/system-monitoring/system-monitoring.routes";
 import { maintenanceRoutes } from "../modules/maintenance/maintenance.routes";
 import attributeRoutes from "../modules/attributes/attribute.routes";
 import brandRoutes from "../modules/brands/brand.routes";
@@ -637,6 +638,8 @@ router.use("/system-logs", systemLogsRoutes);
 router.use("/integrations", integrationsRoutes);
 
 router.use("/health", healthRoutes);
+
+router.use("/system-monitoring", systemMonitoringRoutes);
 
 router.use("/maintenance", maintenanceRoutes);
 

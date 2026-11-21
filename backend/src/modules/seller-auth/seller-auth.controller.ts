@@ -10,6 +10,8 @@ import {
   refreshSellerToken,
   logoutSeller,
   changeSellerPassword,
+  verifySellerLoginChallenge,
+  resendSellerLoginChallenge,
 } from "./seller-auth.service";
 
 export const loginSellerController = asyncHandler(
@@ -22,6 +24,37 @@ export const loginSellerController = asyncHandler(
 
     res.status(200).json(
       ApiResponse.ok(result, "Seller login successful.").serialize(),
+    );
+  },
+);
+
+
+export const verifySellerLoginController = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const result = await verifySellerLoginChallenge(
+      req.body.challengeId,
+      req.body.code,
+      {
+        userAgent: req.get("user-agent"),
+        ipAddress: req.ip,
+        deviceId: req.get("x-device-id"),
+      },
+    );
+
+    res.status(200).json(
+      ApiResponse.ok(result, "Seller login verified successfully.").serialize(),
+    );
+  },
+);
+
+export const resendSellerLoginCodeController = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const result = await resendSellerLoginChallenge(
+      req.body.challengeId,
+    );
+
+    res.status(200).json(
+      ApiResponse.ok(result, "Seller login code resent successfully.").serialize(),
     );
   },
 );

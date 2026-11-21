@@ -17,13 +17,13 @@ import {
 } from "lucide-react";
 
 import { sellerAuthApi } from "@/services/api/seller-auth.api";
-import { useSellerAuthStore } from "@/stores/seller-auth.store";
+
+const SELLER_LOGIN_CHALLENGE_KEY = "noptrix:seller-login-challenge";
 
 export default function SellerLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const setSeller = useSellerAuthStore((state) => state.setSeller);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -37,22 +37,21 @@ export default function SellerLoginForm() {
     setLoading(true);
 
     try {
-      await sellerAuthApi.login({
+      const challenge = await sellerAuthApi.login({
         email: email.trim().toLowerCase(),
         password,
       });
 
-      const seller = await sellerAuthApi.getMe();
-
-      if (seller.status !== "ACTIVE") {
-        await sellerAuthApi.logout();
-        throw new Error(
-          "Your seller account is awaiting Owner verification.",
-        );
+      if (!challenge.verificationRequired || !challenge.challengeId) {
+        throw new Error("Seller login verification was not initiated.");
       }
 
-      setSeller(seller);
-      router.replace("/seller-panel");
+      sessionStorage.setItem(
+        SELLER_LOGIN_CHALLENGE_KEY,
+        JSON.stringify(challenge),
+      );
+
+      router.push("/seller/verify-otp");
     } catch (loginError: unknown) {
       setError(
         loginError instanceof Error
@@ -195,7 +194,7 @@ export default function SellerLoginForm() {
               {loading ? (
                 <>
                   <LoaderCircle className="h-5 w-5 animate-spin" />
-                  Signing in...
+                  Sending verification code...
                 </>
               ) : (
                 <>

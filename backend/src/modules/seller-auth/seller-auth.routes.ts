@@ -9,6 +9,8 @@ import {
     logoutSellerController,
     changeSellerPasswordController,
     getSellerMeController,
+    verifySellerLoginController,
+    resendSellerLoginCodeController,
 } from "./seller-auth.controller";
 
 import {
@@ -16,6 +18,8 @@ import {
     sellerRefreshTokenSchema,
     sellerLogoutSchema,
     sellerChangePasswordSchema,
+    sellerVerifyLoginSchema,
+    sellerResendLoginCodeSchema,
 } from "./seller-auth.validator";
 
 const router = Router();
@@ -24,6 +28,18 @@ router.post(
     "/login",
     validate(sellerLoginSchema, "body"),
     loginSellerController,
+);
+
+router.post(
+    "/verify-login",
+    validate(sellerVerifyLoginSchema, "body"),
+    verifySellerLoginController,
+);
+
+router.post(
+    "/resend-login-code",
+    validate(sellerResendLoginCodeSchema, "body"),
+    resendSellerLoginCodeController,
 );
 
 router.post(
