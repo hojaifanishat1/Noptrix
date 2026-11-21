@@ -181,3 +181,5 @@ export const stopAnnouncementWorker = async (): Promise<void> => {
     "Announcement worker stopped.",
   );
 };
+
+export const getAnnouncementWorker = () => announcementWorker;

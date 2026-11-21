@@ -1,5 +1,13 @@
 import mongoose from "mongoose";
 
+import { getProductPublishWorker } from "../../jobs/product-publish.worker";
+import { getNotificationWorker } from "../../jobs/notification.worker";
+import { getAnnouncementWorker } from "../../jobs/announcement.worker";
+import { getAbandonedCartWorker } from "../abandoned-carts/abandonedCart.worker";
+import { getLiveChatSocketServer } from "../live-chat/live-chat.socket";
+import { getTrackingSocketNamespace } from "../tracking/tracking.socket";
+
+
 import { env } from "../../config/env";
 import { getRedisState, isRedisHealthy } from "../../config/redis";
 
@@ -187,24 +195,33 @@ export const getApiHealth = async () => ({
   memory: process.memoryUsage(),
 });
 
+
+const getWorkerStatus = (worker: any) => {
+  if (!worker) {
+    return { status: "not_started", running: false, paused: false };
+  }
+
+  const running = worker.isRunning();
+  const paused = worker.isPaused();
+
+  return {
+    status: paused ? "paused" : running ? "running" : "stopped",
+    running,
+    paused,
+    closing: worker.closing ?? false,
+    concurrency: worker.opts?.concurrency ?? null,
+  };
+};
+
 export const getWorkerOverview = async () => ({
-  productPublish: {
-    status: "runtime_status_not_exposed",
-    running: null,
+  success: true,
+  timestamp: new Date().toISOString(),
+  workers: {
+    productPublish: getWorkerStatus(getProductPublishWorker()),
+    notification: getWorkerStatus(getNotificationWorker()),
+    announcement: getWorkerStatus(getAnnouncementWorker()),
+    abandonedCart: getWorkerStatus(getAbandonedCartWorker()),
   },
-  notification: {
-    status: "runtime_status_not_exposed",
-    running: null,
-  },
-  announcement: {
-    status: "runtime_status_not_exposed",
-    running: null,
-  },
-  abandonedCart: {
-    status: "runtime_status_not_exposed",
-    running: null,
-  },
-  note: "Worker runtime getters will be connected in the next implementation step.",
 });
 
 export const getEmailHealth = async () => safeCheck(() => checkEmailService());
@@ -213,11 +230,32 @@ export const getSmsHealth = async () => safeCheck(() => checkSmsService());
 
 export const getPushHealth = async () => safeCheck(() => checkPushService());
 
-export const getSocketHealth = async () => ({
-  success: true,
-  status: "not_exposed",
-  message: "Socket namespace metrics are not exposed by the current socket modules.",
-});
+
+export const getSocketHealth = async () => {
+  const io = getLiveChatSocketServer();
+  const tracking = getTrackingSocketNamespace();
+
+  const liveChatConnections = io?.sockets.sockets.size ?? 0;
+  const trackingConnections = tracking?.sockets.size ?? 0;
+  const engineClients = io?.engine.clientsCount ?? 0;
+
+  return {
+    success: true,
+    status: io ? "connected" : "not_started",
+    liveChat: {
+      initialized: Boolean(io),
+      connectedSockets: liveChatConnections,
+      engineClients,
+    },
+    tracking: {
+      initialized: Boolean(tracking),
+      connectedSockets: trackingConnections,
+    },
+    totalNamespaceConnections:
+      liveChatConnections + trackingConnections,
+    timestamp: new Date().toISOString(),
+  };
+};
 
 export const getSystemErrors = async () => {
   const items = await SystemLog.find({

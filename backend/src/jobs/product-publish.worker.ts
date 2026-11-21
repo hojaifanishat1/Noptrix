@@ -92,3 +92,5 @@ export const stopProductPublishWorker = async (): Promise<void> => {
   await productPublishQueue?.close();
   productPublishQueue = null;
 };
+
+export const getProductPublishWorker = () => productPublishWorker;

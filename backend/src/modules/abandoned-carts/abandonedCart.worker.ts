@@ -114,3 +114,5 @@ export async function closeAbandonedCartWorker() {
     queue = null;
   }
 }
+
+export const getAbandonedCartWorker = () => worker;

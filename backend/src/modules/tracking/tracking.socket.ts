@@ -557,3 +557,5 @@ export function broadcastTrackingStatus(tracking: {
       .emit("tracking:completed", payload);
   }
 }
+
+export const getTrackingSocketNamespace = () => trackingNamespace;
