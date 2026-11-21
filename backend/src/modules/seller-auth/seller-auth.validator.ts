@@ -98,3 +98,13 @@ export type SellerLogoutInput = z.infer<typeof sellerLogoutSchema>;
 export type SellerChangePasswordInput = z.infer<
   typeof sellerChangePasswordSchema
 >;
+
+
+export const sellerVerifyLoginSchema = z.object({
+  challengeId: z.string().trim().min(32),
+  code: z.string().trim().regex(/^\d{6}$/),
+});
+
+export const sellerResendLoginCodeSchema = z.object({
+  challengeId: z.string().trim().min(32),
+});

@@ -2,7 +2,7 @@ import { createHash } from "crypto";
 import { Types } from "mongoose";
 
 import { ApiError } from "../../utils/ApiError";
-import { SellerSession } from "./seller-session.model";
+import { SellerSession, type ISellerSession } from "./seller-session.model";
 
 const hashToken = (token: string): string =>
   createHash("sha256").update(token).digest("hex");
@@ -50,7 +50,7 @@ export const findSellerSessionByRefreshToken = async (
 export const findActiveSellerSession = async (
   sellerId: string,
   sessionId: string,
-) => {
+): Promise<ISellerSession | null> => {
   return SellerSession.findOne({
     _id: validateId(sessionId),
     sellerId: validateId(sellerId),

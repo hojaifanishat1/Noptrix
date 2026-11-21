@@ -26,3 +26,16 @@ export interface SellerAuthenticatedIdentity {
   sellerId: Types.ObjectId;
   sessionId: Types.ObjectId;
 }
+
+export interface SellerLoginChallengeResult {
+  verificationRequired: true;
+  challengeId: string;
+  email?: string;
+  phone?: string;
+  expiresAt: Date;
+  resendAvailableAt: Date;
+}
+
+export type SellerLoginResponse =
+  | SellerLoginChallengeResult
+  | SellerLoginResult;
