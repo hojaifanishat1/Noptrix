@@ -73,6 +73,45 @@ function getItems(value: unknown): RecordValue[] {
   return [];
 }
 
+function getQueueItems(value: unknown, failedOnly = false): RecordValue[] {
+  if (!isRecord(value)) return getItems(value);
+
+  const entries = Object.entries(value).filter(([, result]) => isRecord(result));
+  if (!entries.length) return getItems(value);
+
+  const items: RecordValue[] = [];
+
+  for (const [queue, result] of entries) {
+    if (!isRecord(result)) continue;
+
+    const response = result;
+    const health: RecordValue = isRecord(response.data) ? response.data : {};
+    const failed = Number(
+      health.failed ?? health.failedCount ?? response.failed ?? 0
+    );
+
+    if (failedOnly) {
+      if (Number.isFinite(failed) && failed > 0) {
+        items.push({ queue, failed });
+      }
+      continue;
+    }
+
+    if (response.success === false) {
+      items.push({
+        queue,
+        status: "error",
+        error: response.error ?? "Queue health check failed",
+      });
+      continue;
+    }
+
+    items.push({ queue, ...health });
+  }
+
+  return items;
+}
+
 function Status({ value }: { value: unknown }) {
   const status = String(value ?? "unknown").toLowerCase();
   const good = ["active", "success", "processed", "healthy", "connected", "completed", "running", "true", "ready"].includes(status);
@@ -203,16 +242,18 @@ function WorkspaceContent({ kind }: { kind: PageKind }) {
   useEffect(() => { void load(); }, [load]);
 
   const rows = useMemo(() => {
-    let items = getItems(data);
-    if (kind === "failed-jobs") {
-      items = items.map((item) => ({
-        queue: item.queue ?? item.name ?? "Queue",
-        failed: item.failed ?? 0,
-      })).filter((item) => Number(item.failed) > 0);
-    }
+    const items =
+      kind === "queues"
+        ? getQueueItems(data)
+        : kind === "failed-jobs"
+          ? getQueueItems(data, true)
+          : getItems(data);
+
     const query = search.trim().toLowerCase();
     if (!query) return items;
-    return items.filter((item) => JSON.stringify(item).toLowerCase().includes(query));
+    return items.filter((item) =>
+      JSON.stringify(item).toLowerCase().includes(query)
+    );
   }, [data, kind, search]);
 
   const pagination = isRecord(data) && isRecord(data.pagination) ? data.pagination : null;
