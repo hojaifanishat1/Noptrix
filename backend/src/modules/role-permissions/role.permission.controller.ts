@@ -5,6 +5,7 @@ import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiError } from "../../utils/ApiError";
 
 import { getAuthenticatedOwnerId } from "../../middlewares/ownerAuth.middleware";
+import { createAuditLog } from "../audit-logs/audit-log.service";
 
 import {
   assignPermissionToRole,
@@ -15,6 +16,33 @@ import {
   assignPermissionsToRole,
   removePermissionsFromRole,
 } from "./role.permission.service";
+
+/*
+|--------------------------------------------------------------------------
+| Security Audit Helper
+|--------------------------------------------------------------------------
+*/
+
+const auditRolePermissionChange = async (
+  req: Request,
+  description: string,
+  metadata: Record<string, unknown>,
+): Promise<void> => {
+  await createAuditLog({
+    actorId: getAuthenticatedOwnerId(req),
+    actorType: "OWNER",
+    actorRole: "OWNER",
+    action: "PERMISSION_CHANGED",
+    resource: "role-permission",
+    description,
+    method: req.method,
+    path: req.originalUrl,
+    ipAddress: req.ip,
+    userAgent: req.get("user-agent"),
+    metadata,
+    success: true,
+  });
+};
 
 /*
 |--------------------------------------------------------------------------
@@ -53,6 +81,12 @@ export const assignPermissionController = asyncHandler(
       ownerId,
     );
 
+    await auditRolePermissionChange(
+      req,
+      "Permission assigned to role",
+      { roleId, permissionId },
+    );
+
     res.status(201).json({
       success: true,
       message: "Permission assigned to role successfully.",
@@ -76,6 +110,12 @@ export const removePermissionController = asyncHandler(
     getAuthenticatedOwnerId(req);
 
     await removePermissionFromRole(roleId, permissionId);
+
+    await auditRolePermissionChange(
+      req,
+      "Permission removed from role",
+      { roleId, permissionId },
+    );
 
     res.status(200).json({
       success: true,
@@ -174,6 +214,17 @@ export const bulkAssignPermissionsController = asyncHandler(
       ownerId,
     );
 
+    await auditRolePermissionChange(
+      req,
+      "Permissions bulk-assigned to role",
+      {
+        roleId,
+        permissionCount: Array.isArray(permissionIds)
+          ? permissionIds.length
+          : 0,
+      },
+    );
+
     res.status(201).json({
       success: true,
       message: "Permissions assigned successfully.",
@@ -197,6 +248,17 @@ export const bulkRemovePermissionsController = asyncHandler(
     getAuthenticatedOwnerId(req);
 
     await removePermissionsFromRole(roleId, permissionIds);
+
+    await auditRolePermissionChange(
+      req,
+      "Permissions bulk-removed from role",
+      {
+        roleId,
+        permissionCount: Array.isArray(permissionIds)
+          ? permissionIds.length
+          : 0,
+      },
+    );
 
     res.status(200).json({
       success: true,

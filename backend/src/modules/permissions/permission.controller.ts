@@ -5,6 +5,7 @@ import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiError } from "../../utils/ApiError";
 
 import { getAuthenticatedUserId } from "../../middlewares/adminAuth.middleware";
+import { createAuditLog } from "../audit-logs/audit-log.service";
 
 import {
   createPermission,
@@ -23,6 +24,35 @@ import type {
 
 /*
 |--------------------------------------------------------------------------
+| Security Audit Helper
+|--------------------------------------------------------------------------
+*/
+
+const auditPermissionChange = async (
+  req: Request,
+  resourceId: string | undefined,
+  description: string,
+  metadata: Record<string, unknown> = {},
+): Promise<void> => {
+  await createAuditLog({
+    actorId: getAuthenticatedUserId(req),
+    actorType: "OWNER",
+    actorRole: "OWNER",
+    action: "PERMISSION_CHANGED",
+    resource: "permission",
+    ...(resourceId ? { resourceId } : {}),
+    description,
+    method: req.method,
+    path: req.originalUrl,
+    ipAddress: req.ip,
+    userAgent: req.get("user-agent"),
+    metadata,
+    success: true,
+  });
+};
+
+/*
+|--------------------------------------------------------------------------
 | Create Permission
 |--------------------------------------------------------------------------
 */
@@ -34,6 +64,13 @@ export const createPermissionController = asyncHandler(
     const createdBy = getAuthenticatedUserId(req);
 
     const permission = await createPermission(input, createdBy);
+
+    await auditPermissionChange(
+      req,
+      String(permission._id),
+      "Permission created",
+      { permissionKey: permission.key },
+    );
 
     res.status(201).json({
       success: true,
@@ -122,6 +159,13 @@ export const updatePermissionController = asyncHandler(
 
     const permission = await updatePermission(permissionId, input, updatedBy);
 
+    await auditPermissionChange(
+      req,
+      permissionId,
+      "Permission updated",
+      { changedFields: Object.keys(input).join(",") },
+    );
+
     res.status(200).json({
       success: true,
       message: "Permission updated successfully.",
@@ -151,6 +195,12 @@ export const activatePermissionController = asyncHandler(
     const updatedBy = getAuthenticatedUserId(req);
 
     const permission = await activatePermission(permissionId, updatedBy);
+
+    await auditPermissionChange(
+      req,
+      permissionId,
+      "Permission activated",
+    );
 
     res.status(200).json({
       success: true,
@@ -182,6 +232,12 @@ export const deactivatePermissionController = asyncHandler(
 
     const permission = await deactivatePermission(permissionId, updatedBy);
 
+    await auditPermissionChange(
+      req,
+      permissionId,
+      "Permission deactivated",
+    );
+
     res.status(200).json({
       success: true,
       message: "Permission deactivated successfully.",
@@ -209,6 +265,12 @@ export const deletePermissionController = asyncHandler(
     }
 
     await deletePermission(permissionId);
+
+    await auditPermissionChange(
+      req,
+      permissionId,
+      "Permission deleted",
+    );
 
     res.status(200).json({
       success: true,
