@@ -10,6 +10,7 @@ import { maintenanceModeMiddleware } from "./modules/maintenance/maintenance.mid
 import { securityMiddleware } from "./middlewares/security.middleware";
 
 import { globalRateLimiter } from "./middlewares/rateLimit.middleware";
+import { apiRequestLogMiddleware } from "./middlewares/api-request-log.middleware";
 
 import {
   notFoundMiddleware,
@@ -140,7 +141,7 @@ app.get("/", (_req, res) => {
 
 // Maintenance mode runs before API routes.
 // Health and maintenance management endpoints are exempt.
-app.use("/api", maintenanceModeMiddleware, apiRoutes);
+app.use("/api", apiRequestLogMiddleware, maintenanceModeMiddleware, apiRoutes);
 
 /*
 |--------------------------------------------------------------------------
