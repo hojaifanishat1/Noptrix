@@ -647,8 +647,10 @@ router.use("/health", healthRoutes);
 
 router.use("/system-monitoring", systemMonitoringRoutes);
 router.use("/export-jobs", exportJobRoutes);
-router.use("/automation", automationRoutes);
+// Register the more specific schedules route before the general
+// automation router, whose "/:ruleId" route would otherwise intercept it.
 router.use("/automation/schedules", automationScheduleRoutes);
+router.use("/automation", automationRoutes);
 
 router.use("/maintenance", maintenanceRoutes);
 
