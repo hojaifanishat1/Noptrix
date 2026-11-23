@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { Types } from "mongoose";
 
 import { ApiError } from "../../utils/ApiError";
+import { dispatchAutomationEvent } from "../automation/automation.service";
 
 import { Seller } from "./seller.model";
 
@@ -335,6 +336,7 @@ export const updateSellerStatus = async (
     throw ApiError.notFound("Seller not found.");
   }
 
+  const previousStatus = seller.status;
   const nextStatus = input.status;
 
   if (seller.status === nextStatus) {
@@ -410,6 +412,35 @@ export const updateSellerStatus = async (
   seller.updatedBy = actorObjectId;
 
   await seller.save();
+
+  if (nextStatus === "ACTIVE" && previousStatus !== "ACTIVE") {
+    await dispatchAutomationEvent(
+      "SELLER_APPROVED",
+      {
+        sellerId: seller._id.toString(),
+        sellerCode: seller.sellerCode,
+        businessName: seller.businessName,
+        previousStatus,
+        status: seller.status,
+      },
+      `seller-approved:${seller._id.toString()}:${seller.updatedAt.getTime()}`,
+    );
+  }
+
+  if (nextStatus === "SUSPENDED" && previousStatus !== "SUSPENDED") {
+    await dispatchAutomationEvent(
+      "SELLER_SUSPENDED",
+      {
+        sellerId: seller._id.toString(),
+        sellerCode: seller.sellerCode,
+        businessName: seller.businessName,
+        previousStatus,
+        status: seller.status,
+        reason: input.reason,
+      },
+      `seller-suspended:${seller._id.toString()}:${seller.updatedAt.getTime()}`,
+    );
+  }
 
   return seller;
 };

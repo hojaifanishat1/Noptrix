@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Types } from "mongoose";
 
 import { logger } from "../../utils/logger";
+import { dispatchAutomationEvent } from "../automation/automation.service";
 import { Delivery } from "./delivery.model";
 import { Rider } from "../riders/rider.model";
 
@@ -169,8 +170,10 @@ export class DeliveryService {
     delivery.assignedAt = new Date();
     delivery.failureReason = undefined;
 
+    const assignmentEventId = `assigned:${randomUUID()}`;
+
     delivery.events.push({
-      eventId: `assigned:${randomUUID()}`,
+      eventId: assignmentEventId,
       status: "assigned",
       description: "Rider assigned",
       occurredAt: new Date(),
@@ -184,6 +187,18 @@ export class DeliveryService {
         riderId,
       },
       "Rider assigned to delivery",
+    );
+
+    await dispatchAutomationEvent(
+      "DELIVERY_ASSIGNED",
+      {
+        deliveryId: delivery._id.toString(),
+        deliveryNumber: delivery.deliveryNumber,
+        orderId: delivery.orderId.toString(),
+        riderId: delivery.riderId?.toString(),
+        status: delivery.status,
+      },
+      `delivery:${delivery._id.toString()}:${assignmentEventId}`,
     );
 
     return delivery;
@@ -279,6 +294,21 @@ export class DeliveryService {
       },
       "Delivery status updated",
     );
+
+    if (input.status === "delivered") {
+      await dispatchAutomationEvent(
+        "DELIVERY_COMPLETED",
+        {
+          deliveryId: delivery._id.toString(),
+          deliveryNumber: delivery.deliveryNumber,
+          orderId: delivery.orderId.toString(),
+          riderId: delivery.riderId?.toString(),
+          status: delivery.status,
+          deliveredAt: delivery.deliveredAt?.toISOString(),
+        },
+        `delivery:${delivery._id.toString()}:${input.eventId}`,
+      );
+    }
 
     return delivery;
   }

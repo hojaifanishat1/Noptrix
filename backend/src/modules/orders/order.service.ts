@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import mongoose, { Types, type HydratedDocument } from "mongoose";
 
 import { ApiError } from "../../utils/ApiError";
+import { dispatchAutomationEvent } from "../automation/automation.service";
 
 import CheckoutModel from "../checkout/checkout.model";
 import { InventoryModel } from "../inventory/inventory.model";
@@ -250,6 +251,7 @@ export const createOrderFromCheckout = async (
 
   const session = await mongoose.startSession();
   let createdOrder: HydratedDocument<Order> | undefined;
+  let createdByThisCall = false;
 
   try {
     await session.withTransaction(async () => {
@@ -373,10 +375,26 @@ export const createOrderFromCheckout = async (
       await checkout.save({ session });
 
       createdOrder = order;
+      createdByThisCall = true;
     });
 
     if (!createdOrder) {
       throw ApiError.internal("Order creation failed.");
+    }
+
+    if (createdByThisCall) {
+      await dispatchAutomationEvent(
+        "ORDER_CREATED",
+        {
+          orderId: createdOrder._id.toString(),
+          orderNumber: createdOrder.orderNumber,
+          userId: createdOrder.userId.toString(),
+          status: createdOrder.status,
+          totalAmount: createdOrder.totals.totalAmount,
+          currency: createdOrder.totals.currency,
+        },
+        `order-created:${createdOrder._id.toString()}`,
+      );
     }
 
     return createdOrder;
@@ -474,8 +492,8 @@ export const updateOrderStatus = async (
   const orderId = toObjectId(orderIdInput);
   const nextStatus = input.status;
   const session = await mongoose.startSession();
-  let updatedOrder: Awaited<ReturnType<typeof OrderModel.findById>> | null =
-    null;
+  let updatedOrder: HydratedDocument<Order> | null = null;
+  let previousStatus: OrderStatus | undefined;
 
   try {
     await session.withTransaction(async () => {
@@ -489,6 +507,8 @@ export const updateOrderStatus = async (
         updatedOrder = order;
         return;
       }
+
+      previousStatus = order.status;
 
       if (!ORDER_TRANSITIONS[order.status].includes(nextStatus)) {
         throw ApiError.badRequest(
@@ -536,11 +556,33 @@ export const updateOrderStatus = async (
       throw ApiError.internal("Order status update failed.");
     }
 
+    const orderResult = updatedOrder as unknown as HydratedDocument<Order>;
+
+    if (
+      previousStatus !== undefined &&
+      previousStatus !== nextStatus &&
+      (nextStatus === "CONFIRMED" || nextStatus === "CANCELLED")
+    ) {
+      await dispatchAutomationEvent(
+        nextStatus === "CONFIRMED" ? "ORDER_CONFIRMED" : "ORDER_CANCELLED",
+        {
+          orderId: orderResult._id.toString(),
+          orderNumber: orderResult.orderNumber,
+          previousStatus,
+          status: nextStatus,
+          userId: orderResult.userId.toString(),
+          totalAmount: orderResult.totals.totalAmount,
+          currency: orderResult.totals.currency,
+        },
+        `order-status:${orderResult._id.toString()}:${nextStatus}`,
+      );
+    }
+
     if (nextStatus === "DELIVERED") {
       await awardLoyaltyPointsForOrder(orderId.toString());
     }
 
-    return updatedOrder;
+    return orderResult;
   } finally {
     await session.endSession();
   }

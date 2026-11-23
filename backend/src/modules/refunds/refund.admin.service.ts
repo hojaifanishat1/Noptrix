@@ -1,6 +1,7 @@
 import mongoose, { Types } from "mongoose";
 
 import { ApiError } from "../../utils/ApiError";
+import { dispatchAutomationEvent } from "../automation/automation.service";
 import { RefundModel } from "./refund.model";
 import { OrderModel } from "../orders/order.model";
 import { Payment } from "../payments/payment.model";
@@ -147,6 +148,7 @@ export const confirmManualRefund = async (
 
   try {
     let completedRefund: unknown;
+    let automationPayload: Record<string, unknown> | undefined;
 
     await session.withTransaction(async () => {
       const refund = await RefundModel.findOne({
@@ -267,7 +269,24 @@ export const confirmManualRefund = async (
       }
 
       completedRefund = refund.toObject();
+      automationPayload = {
+        refundId: refund._id.toString(),
+        refundNumber: refund.refundNumber,
+        orderId: refund.orderId.toString(),
+        userId: refund.userId.toString(),
+        amount: refund.amount,
+        currency: refund.currency,
+        status: refund.status,
+      };
     });
+
+    if (automationPayload) {
+      await dispatchAutomationEvent(
+        "REFUND_COMPLETED",
+        automationPayload,
+        `refund-completed:${String(automationPayload.refundId)}`,
+      );
+    }
 
     return completedRefund;
   } finally {

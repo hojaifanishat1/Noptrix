@@ -17,6 +17,7 @@ import {
 } from "../transactions/transaction.model";
 import { OrderModel } from "../orders/order.model";
 import { awardLoyaltyPointsForOrder } from "../loyalty/loyalty.service";
+import { dispatchAutomationEvent } from "../automation/automation.service";
 import { WebhookEvent } from "./webhook.model";
 import {
   generalWebhookSchema,
@@ -300,6 +301,20 @@ export async function processGeneralWebhook(input: {
 
     if (String(payment.status).toLowerCase() === "success") {
       await synchronizePaidOrder(payment.orderId);
+      await dispatchAutomationEvent(
+        "PAYMENT_COMPLETED",
+        {
+          paymentId: payment._id.toString(),
+          transactionId: payment.transactionId,
+          orderId: payment.orderId.toString(),
+          amount: payment.amount,
+          currency: payment.currency,
+          method: payment.method,
+          provider: payment.provider,
+          status: payment.status,
+        },
+        `payment-completed:${payment._id.toString()}`,
+      );
       await markEventProcessed(event._id);
 
       return {
@@ -365,6 +380,20 @@ export async function processGeneralWebhook(input: {
 
       if (targetStatus === "success") {
         await synchronizePaidOrder(updated.orderId);
+        await dispatchAutomationEvent(
+          "PAYMENT_COMPLETED",
+          {
+            paymentId: updated._id.toString(),
+            transactionId: updated.transactionId,
+            orderId: updated.orderId.toString(),
+            amount: updated.amount,
+            currency: updated.currency,
+            method: updated.method,
+            provider: updated.provider,
+            status: updated.status,
+          },
+          `payment-completed:${updated._id.toString()}`,
+        );
       } else if (targetStatus === "failed") {
         await OrderModel.updateOne(
           {
@@ -517,6 +546,20 @@ export async function processSslCommerzIpn(rawPayload: unknown) {
 
     if (String(payment.status).toLowerCase() === "success") {
       await synchronizePaidOrder(payment.orderId);
+      await dispatchAutomationEvent(
+        "PAYMENT_COMPLETED",
+        {
+          paymentId: payment._id.toString(),
+          transactionId: payment.transactionId,
+          orderId: payment.orderId.toString(),
+          amount: payment.amount,
+          currency: payment.currency,
+          method: payment.method,
+          provider: payment.provider,
+          status: payment.status,
+        },
+        `payment-completed:${payment._id.toString()}`,
+      );
       await markEventProcessed(event._id);
       return { received: true, duplicate: false, ignored: true };
     }
@@ -560,6 +603,20 @@ export async function processSslCommerzIpn(rawPayload: unknown) {
       }
 
       await synchronizePaidOrder(updated.orderId);
+      await dispatchAutomationEvent(
+        "PAYMENT_COMPLETED",
+        {
+          paymentId: updated._id.toString(),
+          transactionId: updated.transactionId,
+          orderId: updated.orderId.toString(),
+          amount: updated.amount,
+          currency: updated.currency,
+          method: updated.method,
+          provider: updated.provider,
+          status: updated.status,
+        },
+        `payment-completed:${updated._id.toString()}`,
+      );
     }
 
     await markEventProcessed(event._id);

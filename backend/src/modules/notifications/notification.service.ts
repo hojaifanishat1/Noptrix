@@ -245,6 +245,7 @@ const buildEventKey = (
   }
 
   const entityId =
+    metadata.automationEventId ??
     metadata.applicationId ??
     metadata.orderId ??
     metadata.paymentId ??

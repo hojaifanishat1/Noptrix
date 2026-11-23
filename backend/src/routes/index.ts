@@ -62,6 +62,8 @@ import { healthRoutes } from "../modules/health/health.routes";
 import systemMonitoringRoutes from "../modules/system-monitoring/system-monitoring.routes";
 import securityCenterRoutes from "../modules/security-center/security-center.routes";
 import exportJobRoutes from "../modules/export-jobs/export-job.routes";
+import automationRoutes from "../modules/automation/automation.routes";
+import automationScheduleRoutes from "../modules/automation-schedules/automation-schedule.routes";
 import { maintenanceRoutes } from "../modules/maintenance/maintenance.routes";
 import attributeRoutes from "../modules/attributes/attribute.routes";
 import brandRoutes from "../modules/brands/brand.routes";
@@ -645,6 +647,8 @@ router.use("/health", healthRoutes);
 
 router.use("/system-monitoring", systemMonitoringRoutes);
 router.use("/export-jobs", exportJobRoutes);
+router.use("/automation", automationRoutes);
+router.use("/automation/schedules", automationScheduleRoutes);
 
 router.use("/maintenance", maintenanceRoutes);
 

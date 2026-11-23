@@ -1,6 +1,7 @@
 import mongoose, { Types } from "mongoose";
 
 import { ApiError } from "../../utils/ApiError";
+import { dispatchAutomationEvent } from "../automation/automation.service";
 import { OrderModel } from "../orders/order.model";
 import { ReturnModel } from "../returns/return.model";
 import { CancellationModel } from "../cancellations/cancellation.model";
@@ -114,7 +115,7 @@ export const createRefund = async (
   }
 
   try {
-    return await RefundModel.create({
+    const createdRefund = await RefundModel.create({
       refundNumber: createRefundNumber(),
       orderId: order._id,
       userId: toObjectId(userId),
@@ -132,6 +133,23 @@ export const createRefund = async (
       idempotencyKey: input.idempotencyKey,
       requestedAt: new Date(),
     });
+
+    await dispatchAutomationEvent(
+      "REFUND_REQUESTED",
+      {
+        refundId: createdRefund._id.toString(),
+        refundNumber: createdRefund.refundNumber,
+        orderId: createdRefund.orderId.toString(),
+        userId: createdRefund.userId.toString(),
+        amount: createdRefund.amount,
+        currency: createdRefund.currency,
+        status: createdRefund.status,
+        reason: createdRefund.reason,
+      },
+      `refund-requested:${createdRefund._id.toString()}`,
+    );
+
+    return createdRefund;
   } catch (error) {
     if (
       error instanceof mongoose.mongo.MongoServerError &&

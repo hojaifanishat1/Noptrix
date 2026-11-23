@@ -9,6 +9,7 @@ import {
   TRANSACTION_TYPES,
 } from "../transactions/transaction.model";
 import { awardLoyaltyPointsForOrder } from "../loyalty/loyalty.service";
+import { dispatchAutomationEvent } from "../automation/automation.service";
 
 import {
   createPayment,
@@ -205,6 +206,23 @@ export async function initiateCustomerPayment(input: {
         orderNumber: order.orderNumber,
       },
     });
+
+    if (status === "success") {
+      await dispatchAutomationEvent(
+        "PAYMENT_COMPLETED",
+        {
+          paymentId: updated._id.toString(),
+          transactionId: updated.transactionId,
+          orderId: updated.orderId.toString(),
+          amount: updated.amount,
+          currency: updated.currency,
+          method: updated.method,
+          provider: updated.provider,
+          status: updated.status,
+        },
+        `payment-completed:${updated._id.toString()}`,
+      );
+    }
 
     return {
       reused: false,

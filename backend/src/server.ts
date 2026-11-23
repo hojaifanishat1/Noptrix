@@ -1,3 +1,4 @@
+import { startAutomationScheduleWorker, stopAutomationScheduleWorker } from "./jobs/automation-schedule.worker";
 import http from "http";
 
 import app from "./app";
@@ -117,6 +118,7 @@ const gracefulShutdown = async (signal: string): Promise<void> => {
 
     try {
       await stopNotificationWorker();
+      void stopAutomationScheduleWorker();
 
       logger.info("Notification worker stopped.");
     } catch (error) {
@@ -285,6 +287,7 @@ const bootstrap = async (): Promise<void> => {
         */
 
     startNotificationWorker();
+    void startAutomationScheduleWorker();
 
     logger.info("Notification worker started.");
 
