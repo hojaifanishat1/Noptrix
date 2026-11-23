@@ -300,3 +300,6 @@ export const removeAnnouncementJob = async (
     "Announcement job removed.",
   );
 };
+
+// Owner-only operational access; route authorization is enforced by system-monitoring.
+export const getAdminAnnouncementQueue = getAnnouncementQueue;

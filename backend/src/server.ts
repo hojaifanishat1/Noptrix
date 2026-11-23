@@ -8,6 +8,12 @@ import {
 import { initializeTrackingSocket } from "./modules/tracking/tracking.socket";
 
 import { env } from "./config/env";
+import { startExportWorker, stopExportWorker } from "./modules/export-jobs/export-job.worker";
+import { closeExportQueue } from "./modules/export-jobs/export-job.queue";
+import {
+  startExportExpiryWorker,
+  stopExportExpiryWorker,
+} from "./modules/export-jobs/export-expiry.worker";
 
 import { connectDatabase, disconnectDatabase } from "./config/database";
 
@@ -170,6 +176,15 @@ const gracefulShutdown = async (signal: string): Promise<void> => {
       );
     }
 
+    try {
+      await stopExportExpiryWorker();
+      await stopExportWorker();
+      await closeExportQueue();
+      logger.info("Export worker and queue stopped.");
+    } catch (error) {
+      logger.error({ error }, "Export worker shutdown failed.");
+    }
+
     /*
             |--------------------------------------------------------------------------
             | Disconnect Redis
@@ -291,6 +306,10 @@ const bootstrap = async (): Promise<void> => {
       logger.info("Cloudinary connection established.");
     }
 
+    startExportWorker();
+    await startExportExpiryWorker();
+    logger.info("Export worker and expiry cleanup worker started.");
+
     /*
         |--------------------------------------------------------------------------
         | Email / SMTP
@@ -382,6 +401,14 @@ const bootstrap = async (): Promise<void> => {
         { error: shutdownError },
         "Product publish worker cleanup failed after startup error.",
       );
+    }
+
+    try {
+      await stopExportExpiryWorker();
+      await stopExportWorker();
+      await closeExportQueue();
+    } catch (shutdownError) {
+      logger.error({ error: shutdownError }, "Export worker cleanup failed.");
     }
 
     /*

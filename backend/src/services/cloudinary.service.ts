@@ -608,8 +608,8 @@ export const uploadBase64ToCloudinary = async (
 
 export const deleteFromCloudinary = async (
   publicId: string,
-
   resourceType: UploadApiOptions["resource_type"] = DEFAULT_RESOURCE_TYPE,
+  deliveryType?: "upload" | "private" | "authenticated",
 ): Promise<CloudinaryDeleteResult> => {
   ensureCloudinaryConfigured();
 
@@ -627,9 +627,9 @@ export const deleteFromCloudinary = async (
 
       {
         resource_type: resourceType,
-
         invalidate: true,
-      },
+        ...(deliveryType ? { type: deliveryType } : {}),
+      } as never,
     );
 
     logger.info(

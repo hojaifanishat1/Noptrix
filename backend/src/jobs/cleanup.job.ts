@@ -601,3 +601,6 @@ export const closeCleanupQueue = async (): Promise<void> => {
     "Cleanup queue closed.",
   );
 };
+
+// Owner-only operational access; route authorization is enforced by system-monitoring.
+export const getAdminCleanupQueue = getCleanupQueue;

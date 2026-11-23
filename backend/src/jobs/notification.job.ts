@@ -467,3 +467,6 @@ export const closeNotificationQueue = async (): Promise<void> => {
     "Notification queue closed.",
   );
 };
+
+// Owner-only operational access; route authorization is enforced by system-monitoring.
+export const getAdminNotificationQueue = getNotificationQueue;

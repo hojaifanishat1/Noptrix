@@ -375,3 +375,6 @@ export const closePaymentQueue = async (): Promise<void> => {
     "Payment queue closed.",
   );
 };
+
+// Owner-only operational access; route authorization is enforced by system-monitoring.
+export const getAdminPaymentQueue = getPaymentQueue;

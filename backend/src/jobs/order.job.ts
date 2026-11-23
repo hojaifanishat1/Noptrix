@@ -286,3 +286,6 @@ export const closeOrderQueue = async (): Promise<void> => {
     "Order queue closed.",
   );
 };
+
+// Owner-only operational access; route authorization is enforced by system-monitoring.
+export const getAdminOrderQueue = getOrderQueue;

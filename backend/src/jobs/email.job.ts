@@ -648,3 +648,6 @@ export const closeEmailQueue = async (): Promise<void> => {
     "Email queue closed.",
   );
 };
+
+// Owner-only operational access; route authorization is enforced by system-monitoring.
+export const getAdminEmailQueue = getEmailQueue;

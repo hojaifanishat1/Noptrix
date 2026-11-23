@@ -11,6 +11,7 @@ import { webhookEventsApi } from "@/services/api/webhook-events.api";
 import { systemMonitoringApi } from "@/services/api/system-monitoring.api";
 import { systemLogsApi } from "@/services/api/system-logs.api";
 import { integrationsApi } from "@/services/api/integrations.api";
+import ExportJobsWorkspace from "./export-jobs-workspace";
 
 type PageKind =
   | "api-logs" | "events" | "webhooks" | "queues"
@@ -356,5 +357,11 @@ function WorkspaceContent({ kind }: { kind: PageKind }) {
 }
 
 export default function OperationsWorkspace({ kind }: { kind: PageKind }) {
-  return <OwnerAuthGuard><WorkspaceContent kind={kind} /></OwnerAuthGuard>;
+  return (
+    <OwnerAuthGuard>
+      {kind === "export-jobs"
+        ? <ExportJobsWorkspace />
+        : <WorkspaceContent kind={kind} />}
+    </OwnerAuthGuard>
+  );
 }
