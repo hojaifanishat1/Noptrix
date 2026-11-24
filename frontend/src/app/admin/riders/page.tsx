@@ -347,7 +347,7 @@ export default function OwnerRidersPage() {
       cell: (rider: Rider) => (
         <div className="flex items-center gap-2">
           <Link
-            href={`/owner/riders/${rider._id}`}
+            href={`/admin/riders/${rider._id}`}
             title="View rider"
             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border text-slate-600 hover:bg-slate-50"
           >
