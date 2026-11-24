@@ -36,6 +36,8 @@ export interface IRiderEarning {
 
   orderId?: Types.ObjectId;
 
+  payoutId?: Types.ObjectId;
+
   type: RiderEarningType;
 
   amount: number;
@@ -85,6 +87,13 @@ const riderEarningSchema = new Schema<IRiderEarning>(
     orderId: {
       type: Schema.Types.ObjectId,
       ref: "Order",
+      index: true,
+    },
+
+    payoutId: {
+      type: Schema.Types.ObjectId,
+      ref: "RiderPayout",
+      default: undefined,
       index: true,
     },
 

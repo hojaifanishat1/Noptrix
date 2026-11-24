@@ -282,6 +282,10 @@ export const updateSeller = async (
     seller.phone = input.phone;
   }
 
+  if (input.commissionRate !== undefined) {
+    seller.commissionRate = input.commissionRate;
+  }
+
   if (input.taxNumber !== undefined) {
     seller.taxNumber = input.taxNumber;
   }

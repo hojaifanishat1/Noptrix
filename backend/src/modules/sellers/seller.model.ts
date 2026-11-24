@@ -16,6 +16,7 @@ export interface ISeller extends Document {
   legalName?: string;
   email: string;
   phone?: string;
+  commissionRate?: number;
 
   password: string;
   failedLoginAttempts: number;
@@ -100,6 +101,13 @@ const sellerSchema = new Schema<ISeller>(
       type: String,
       trim: true,
       maxlength: 30,
+    },
+
+    commissionRate: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: undefined,
     },
 
     password: {

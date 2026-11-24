@@ -49,6 +49,7 @@ export interface IRider extends Document {
   isAvailable: boolean;
   currentLatitude?: number;
   currentLongitude?: number;
+  currentAddress?: string;
   lastLocationAt?: Date;
   maxActiveDeliveries: number;
 
@@ -205,6 +206,12 @@ const riderSchema = new Schema<IRider>(
     type: Number,
     min: -180,
     max: 180,
+  },
+
+  currentAddress: {
+    type: String,
+    trim: true,
+    maxlength: 500,
   },
 
   lastLocationAt: {

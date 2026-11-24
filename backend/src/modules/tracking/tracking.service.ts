@@ -404,6 +404,7 @@ export const updateTrackingLocation = async (
         $set: {
           currentLatitude: input.latitude,
           currentLongitude: input.longitude,
+          ...(input.address ? { currentAddress: input.address } : {}),
           lastLocationAt: tracking.lastLocationAt,
         },
       },

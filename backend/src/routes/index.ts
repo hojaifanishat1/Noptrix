@@ -29,6 +29,7 @@ import sellerApplicationRoutes from "../modules/seller-applications/seller-appli
 import sellerOpportunityRoutes from "../modules/seller-opportunities/seller-opportunity.routes";
 import sellerInvitationRoutes from "../modules/seller-invitations/seller-invitation.routes";
 import sellerRoutes from "../modules/sellers/seller.routes";
+import sellerPayoutRoutes from "../modules/seller-payouts/sellerPayout.routes";
 import onboardingRoutes from "../modules/onboarding/onboarding.routes";
 import sellerProductRoutes from "../modules/seller-products/seller-product.routes";
 import sellerOrderRoutes from "../modules/seller-orders/seller-order.routes";
@@ -37,6 +38,7 @@ import riderInvitationRoutes from "../modules/rider-invitations/rider-invitation
 import trackingRoutes from "../modules/tracking/tracking.routes";
 import riderAuthRoutes from "../modules/rider-auth/rider-auth.routes";
 import riderEarningRoutes from "../modules/rider-earnings/riderEarning.routes";
+import riderPayoutRoutes from "../modules/rider-payouts/riderPayout.routes";
 import sellerAuthRoutes from "../modules/seller-auth/seller-auth.routes";
 import communicationRoutes from "../modules/communication/communication.routes";
 import liveChatRoutes from "../modules/live-chat/live-chat.routes";
@@ -256,6 +258,7 @@ router.use("/admin-invitations", adminInvitationRoutes);
 */
 
 router.use("/sellers", sellerRoutes);
+router.use("/seller-payouts/admin", sellerPayoutRoutes);
 router.use("/onboarding", onboardingRoutes);
 
 router.use("/seller-products", sellerProductRoutes);
@@ -447,6 +450,7 @@ router.use("/riders", riderRoutes);
 router.use("/tracking", trackingRoutes);
 
 router.use("/rider-earnings", riderEarningRoutes);
+router.use("/rider-payouts/admin", riderPayoutRoutes);
 
 router.use("/cod", codRoutes);
 /*

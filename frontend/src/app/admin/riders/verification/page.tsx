@@ -4,6 +4,7 @@ import { isAxiosError } from "axios";
 import Link from "next/link";
 
 import RiderDocumentReview from "@/features/riders/rider-document-review";
+import RiderProfileCompletionForm from "@/features/riders/rider-profile-completion-form";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -137,11 +138,15 @@ export default function RiderVerificationPage() {
 
   const summary = useMemo(
     () => ({
-      active: riders.filter((rider) => rider.status === "ACTIVE").length,
+      completed: riders.filter(
+        (rider) => rider.onboardingStatus === "COMPLETED",
+      ).length,
+      inProgress: riders.filter(
+        (rider) => rider.onboardingStatus === "IN_PROGRESS",
+      ).length,
       missingDetails: riders.filter(
         (rider) => !rider.nationalId || !rider.licenseNumber,
       ).length,
-      pending: riders.filter((rider) => rider.status === "PENDING").length,
     }),
     [riders],
   );
@@ -206,7 +211,7 @@ export default function RiderVerificationPage() {
 
       <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
         Review submitted National ID, driving license, vehicle registration
-        and insurance documents. Approve or reject each document with a reason.
+        and insurance documents. Approve or reject each document with a reason. Approved files do not automatically fill profile fields such as National ID or license number.
       </div>
 
       {error && (
@@ -218,7 +223,7 @@ export default function RiderVerificationPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           title="Matching riders"
           value={pagination.total}
@@ -226,13 +231,19 @@ export default function RiderVerificationPage() {
           icon={Bike}
         />
         <SummaryCard
-          title="Pending on this page"
-          value={summary.pending}
-          description="Awaiting activation"
+          title="Onboarding completed"
+          value={summary.completed}
+          description={`On page ${pagination.page}`}
+          icon={BadgeCheck}
+        />
+        <SummaryCard
+          title="Onboarding in progress"
+          value={summary.inProgress}
+          description={`On page ${pagination.page}`}
           icon={ShieldAlert}
         />
         <SummaryCard
-          title="Missing ID or license"
+          title="Incomplete profile details"
           value={summary.missingDetails}
           description={`On page ${pagination.page}`}
           icon={FileText}
@@ -325,11 +336,15 @@ export default function RiderVerificationPage() {
                     <p>Vehicle: {formatVehicle(rider.vehicleType)}</p>
                     <p>Vehicle number: {rider.vehicleNumber || "Not provided"}</p>
                     <p>
-                      National ID:{" "}
+                      Onboarding:{" "}
+                      {rider.onboardingStatus ?? "NOT_STARTED"}
+                    </p>
+                    <p>
+                      Profile National ID:{" "}
                       {rider.nationalId ? "Provided" : "Missing"}
                     </p>
                     <p>
-                      Driving license:{" "}
+                      Profile driving license:{" "}
                       {rider.licenseNumber ? "Provided" : "Missing"}
                     </p>
                     <p>Profile updated: {formatDate(rider.updatedAt)}</p>
@@ -375,6 +390,10 @@ export default function RiderVerificationPage() {
                   ))}
                 </div>
               </div>
+                <RiderProfileCompletionForm
+                  rider={rider}
+                  onSaved={() => void loadRiders()}
+                />
                 <RiderDocumentReview
                   riderId={rider._id}
                   riderName={rider.name}

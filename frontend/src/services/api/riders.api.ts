@@ -31,7 +31,13 @@ export interface Rider {
   licenseNumber?: string;
   nationalId?: string;
   status: RiderStatus;
+  onboardingStatus?: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
+  onboardingCompletedAt?: string;
   isAvailable: boolean;
+  currentLatitude?: number;
+  currentLongitude?: number;
+  currentAddress?: string;
+  lastLocationAt?: string;
   joinedAt?: string;
   notes?: string;
   suspensionReason?: string;
@@ -100,6 +106,23 @@ export const ridersApi = {
   ): Promise<RiderInvitationResult> {
     const response = await apiClient.post<ApiResponse<RiderInvitationResult>>(
       `/riders/applications/${applicationId}/convert`,
+      input,
+    );
+
+    return response.data.data;
+  },
+
+  async updateProfile(
+    riderId: string,
+    input: {
+      phone?: string;
+      vehicleNumber?: string;
+      licenseNumber?: string;
+      nationalId?: string;
+    },
+  ): Promise<Rider> {
+    const response = await apiClient.patch<ApiResponse<Rider>>(
+      `/riders/${riderId}`,
       input,
     );
 

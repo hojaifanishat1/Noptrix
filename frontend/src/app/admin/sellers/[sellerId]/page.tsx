@@ -123,6 +123,9 @@ export default function SellerDetailPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
+  const [commissionRate, setCommissionRate] = useState("");
+  const [savingCommission, setSavingCommission] = useState(false);
+  const [commissionNotice, setCommissionNotice] = useState("");
 
   const loadSeller = useCallback(async () => {
     if (!sellerId) return;
@@ -139,6 +142,11 @@ export default function SellerDetailPage() {
       }
 
       setSeller(result);
+      setCommissionRate(
+        result.commissionRate === undefined || result.commissionRate === null
+          ? ""
+          : String(result.commissionRate),
+      );
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -186,6 +194,40 @@ export default function SellerDetailPage() {
       setError(getErrorMessage(err));
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleCommissionSave = async () => {
+    if (!seller) return;
+
+    const rate = Number(commissionRate);
+
+    if (
+      commissionRate.trim() === "" ||
+      !Number.isFinite(rate) ||
+      rate < 0 ||
+      rate > 100
+    ) {
+      setError("Enter a commission rate between 0 and 100.");
+      return;
+    }
+
+    setSavingCommission(true);
+    setError("");
+    setCommissionNotice("");
+
+    try {
+      const updatedSeller = await sellersApi.update(seller._id, {
+        commissionRate: rate,
+      });
+
+      setSeller(updatedSeller);
+      setCommissionRate(String(updatedSeller.commissionRate ?? rate));
+      setCommissionNotice("Seller commission rate updated successfully.");
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setSavingCommission(false);
     }
   };
 
@@ -399,6 +441,57 @@ export default function SellerDetailPage() {
           <div className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">
             <strong>Rejection reason:</strong> {seller.rejectionReason}
           </div>
+        )}
+      </section>
+
+      {/* Seller Commission */}
+      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900">
+          Seller Commission
+        </h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Set the platform commission percentage for this seller. This rate
+          applies when new seller payouts are generated; existing payouts
+          remain unchanged.
+        </p>
+
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="w-full sm:max-w-xs">
+            <label
+              htmlFor="seller-commission-rate"
+              className="mb-2 block text-sm font-medium text-gray-700"
+            >
+              Commission Rate (%)
+            </label>
+            <input
+              id="seller-commission-rate"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={commissionRate}
+              onChange={(event) => {
+                setCommissionRate(event.target.value);
+                setCommissionNotice("");
+              }}
+              placeholder="e.g. 10"
+              disabled={savingCommission}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-gray-100"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void handleCommissionSave()}
+            disabled={savingCommission || commissionRate.trim() === ""}
+            className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {savingCommission ? "Saving..." : "Save Commission"}
+          </button>
+        </div>
+
+        {commissionNotice && (
+          <p className="mt-3 text-sm text-green-700">{commissionNotice}</p>
         )}
       </section>
 

@@ -508,7 +508,7 @@ export const ADMIN_NAVIGATION_SECTIONS: readonly AdminNavigationSection[] = [
       {
         id: "rider-tracking",
         label: "Rider Tracking",
-        href: "/admin/tracking",
+        href: "/admin/riders/tracking",
         icon: Globe,
         permission: "tracking.read",
       },

@@ -3,6 +3,7 @@ import { Types } from "mongoose";
 import { ApiError } from "../../utils/ApiError";
 
 import { Rider, IRider } from "./rider.model";
+import { refreshOnboardingCompletion } from "../onboarding/onboarding-progress.service";
 
 import {
   CreateRiderInput,
@@ -383,6 +384,14 @@ export const updateRider = async (
   }
 
   await rider.save();
+
+  const progress = await refreshOnboardingCompletion(
+    "RIDER",
+    String(rider._id),
+  );
+
+  rider.onboardingStatus = progress.onboardingStatus;
+  rider.onboardingCompletedAt = progress.onboardingCompletedAt;
 
   return rider;
 };

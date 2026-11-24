@@ -36,6 +36,10 @@ export interface RiderProfile extends AuthUser {
     onboardingStatus?: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
     vehicleType?: string;
     vehicleNumber?: string;
+    isAvailable?: boolean;
+    currentLatitude?: number;
+    currentLongitude?: number;
+    lastLocationAt?: string;
 }
 
 export const riderAuthApi = {
@@ -77,6 +81,25 @@ export const riderAuthApi = {
         const response = await apiClient.get<
             ApiResponse<RiderProfile>
         >("/rider-auth/me");
+
+        return response.data.data;
+    },
+
+    async updateLocation(input: {
+        latitude: number;
+        longitude: number;
+    }): Promise<RiderProfile> {
+        const response = await apiClient.patch<
+            ApiResponse<RiderProfile>
+        >("/riders/me/location", input);
+
+        return response.data.data;
+    },
+
+    async updateAvailability(isAvailable: boolean): Promise<RiderProfile> {
+        const response = await apiClient.patch<
+            ApiResponse<RiderProfile>
+        >("/riders/me/availability", { isAvailable });
 
         return response.data.data;
     },

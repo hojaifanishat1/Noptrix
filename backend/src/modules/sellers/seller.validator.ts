@@ -105,6 +105,8 @@ export const updateSellerSchema = z
 
     phone: phoneSchema.optional(),
 
+    commissionRate: z.number().min(0).max(100).optional(),
+
     taxNumber: z.string().trim().max(100).optional(),
 
     registrationNumber: z.string().trim().max(100).optional(),

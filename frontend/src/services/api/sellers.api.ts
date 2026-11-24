@@ -24,6 +24,7 @@ export interface Seller {
   legalName?: string;
   email: string;
   phone?: string;
+  commissionRate?: number;
   taxNumber?: string;
   registrationNumber?: string;
   description?: string;
@@ -76,6 +77,18 @@ export const sellersApi = {
   async getById(sellerId: string): Promise<Seller> {
     const response = await apiClient.get<ApiResponse<Seller>>(
       `/sellers/${sellerId}`,
+    );
+
+    return response.data.data;
+  },
+
+  async update(
+    sellerId: string,
+    input: { commissionRate?: number },
+  ): Promise<Seller> {
+    const response = await apiClient.patch<ApiResponse<Seller>>(
+      `/sellers/${sellerId}`,
+      input,
     );
 
     return response.data.data;
