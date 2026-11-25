@@ -493,6 +493,40 @@ const assertCanMessage = async (
     });
   }
 
+  // Riders may reply only to an active administrative participant
+  // in a conversation they already belong to.
+  const activeRiderSender = await Rider.exists({
+    _id: senderId,
+    status: "ACTIVE",
+  });
+
+  if (activeRiderSender) {
+    const [recipientOwner, recipientAdmin, recipientEmployee] =
+      await Promise.all([
+        Owner.exists({
+          userId: recipientId,
+          status: OWNER_STATUSES.ACTIVE,
+        }),
+        Admin.exists({
+          $or: [{ userId: recipientId }, { _id: recipientId }],
+          status: ADMIN_STATUSES.ACTIVE,
+        }),
+        Employee.exists({
+          userId: recipientId,
+          status: EMPLOYEE_STATUSES.ACTIVE,
+        }),
+      ]);
+
+    if (!recipientOwner && !recipientAdmin && !recipientEmployee) {
+      throw ApiError.forbidden(
+        "Riders can only reply to active NOPTRIX administrative accounts.",
+        { code: "RIDER_MESSAGE_RECIPIENT_FORBIDDEN" },
+      );
+    }
+
+    return;
+  }
+
   await assertActiveAdministrativeSender(senderId);
 
   const directRider = await Rider.exists({

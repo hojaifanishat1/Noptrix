@@ -189,6 +189,23 @@ export const getRiderByUserId = async (userId: string): Promise<IRider> => {
 */
 
 export const getAllRiders = async (query: RiderQueryInput) => {
+  // Automatically mark riders offline when GPS has been stale for 5 minutes.
+  const staleLocationBefore = new Date(Date.now() - 5 * 60 * 1000);
+
+  await Rider.updateMany(
+    {
+      isAvailable: true,
+      $or: [
+        { lastLocationAt: { $exists: false } },
+        { lastLocationAt: null },
+        { lastLocationAt: { $lte: staleLocationBefore } },
+      ],
+    },
+    {
+      $set: { isAvailable: false },
+    },
+  );
+
   const page = query.page ?? 1;
 
   const limit = query.limit ?? 20;

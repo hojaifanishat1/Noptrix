@@ -141,7 +141,9 @@ export function RiderChatWorkspace({ mode, participantTypeFilter }: { mode: Mode
         ? (message.senderId === authUser?.id
             ? message.recipientName
             : message.senderName)
-        : message.senderName;
+        : (message.senderId === riderId
+            ? message.recipientName
+            : message.senderName);
     const term = search.trim().toLowerCase();
     return (
       !term ||
@@ -233,15 +235,13 @@ export function RiderChatWorkspace({ mode, participantTypeFilter }: { mode: Mode
       }
       setBody("");
       await loadInbox();
-      if (selectedId) {
-        const latest = messages.find((item) => threadKey(item) === selectedId);
-        if (latest) {
-          const updated =
-            mode === "admin"
-              ? await communicationApi.getThread(latest._id)
-              : await riderMessagesApi.getThread(latest._id);
-          setThread(updated);
-        }
+      if (selectedId && thread[0]) {
+        const rootMessageId = thread[0]._id;
+        const updated =
+          mode === "admin"
+            ? await communicationApi.getThread(rootMessageId)
+            : await riderMessagesApi.getThread(rootMessageId);
+        setThread(updated);
       }
     } catch (err) {
       setError(getError(err));
@@ -259,7 +259,9 @@ export function RiderChatWorkspace({ mode, participantTypeFilter }: { mode: Mode
       ? (selectedConversation.senderId === authUser?.id
           ? selectedConversation.recipientName
           : selectedConversation.senderName)
-      : selectedConversation.senderName
+      : (selectedConversation.senderId === riderId
+          ? selectedConversation.recipientName
+          : selectedConversation.senderName)
     : "";
 
   return (
@@ -336,7 +338,9 @@ export function RiderChatWorkspace({ mode, participantTypeFilter }: { mode: Mode
                   ? (message.senderId === authUser?.id
                       ? message.recipientName
                       : message.senderName)
-                  : message.senderName;
+                  : (message.senderId === riderId
+                      ? message.recipientName
+                      : message.senderName);
               const otherRole =
                 mode === "admin"
                   ? (message.senderId === authUser?.id

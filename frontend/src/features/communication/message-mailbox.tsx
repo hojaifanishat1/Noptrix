@@ -849,8 +849,8 @@ export function MessageMailbox({
                     </p>
                   </div>
                 ) : (
-                  <div className="grid min-w-0 gap-0 xl:grid-cols-[minmax(280px,0.9fr)_minmax(360px,1.1fr)]">
-                    <div className="min-w-0 space-y-0 border-border xl:border-r">
+                  <div className="grid min-w-0 gap-0 xl:grid-cols-[minmax(280px,0.9fr)_minmax(360px,1.1fr)] bg-white">
+                    <div className="min-w-0 space-y-0 border-border bg-white xl:border-r">
                       <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/30 p-3">
                         <label className="mr-auto flex items-center gap-2 text-sm">
                           <input
@@ -911,13 +911,13 @@ export function MessageMailbox({
                       {conversations.map((message) => (
                         <article
                           key={message._id}
-                          className={`border-b border-border transition-colors ${
+                          className={`border-b border-slate-100 transition-colors ${
                             previewMessageId === message._id
-                              ? "border-l-4 border-l-primary bg-primary/10"
+                              ? "border-l-4 border-l-emerald-500 bg-emerald-50"
                               : message.recipientId === userId &&
                                   message.status === "SENT"
-                                ? "border-l-4 border-l-primary/50 bg-primary/[0.04]"
-                                : "border-l-4 border-l-transparent hover:bg-muted/50"
+                                ? "border-l-4 border-l-emerald-300 bg-emerald-50/60"
+                                : "border-l-4 border-l-transparent hover:bg-slate-50"
                           }`}
                         >
                           <div className="flex items-center gap-2 px-3 py-4 hover:bg-muted/30">
@@ -1032,14 +1032,14 @@ export function MessageMailbox({
                         </article>
                       ))}
                     </div>
-                    <aside className="flex min-h-[520px] flex-col overflow-hidden bg-muted/10">
+                    <aside className="flex min-h-[520px] flex-col overflow-hidden border-l border-slate-200 bg-[#efeae2]">
                       {previewLoading ? (
                         <p className="p-8 text-center text-sm text-muted-foreground">
                           Loading conversation...
                         </p>
                       ) : previewThread.length > 0 ? (
                         <div className="flex h-full flex-col">
-                          <div className="border-b border-border bg-card p-4">
+                          <div className="border-b border-slate-200 bg-white p-4">
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <h2 className="font-semibold">
@@ -1059,12 +1059,13 @@ export function MessageMailbox({
                               </Link>
                             </div>
                           </div>
-                          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[radial-gradient(circle_at_1px_1px,hsl(var(--border))_1px,transparent_0)] [background-size:22px_22px] p-4 md:p-6">
+                          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[#efeae2] p-4 md:p-6">
                             {previewThread.map((entry) => (
                               <article
                                 key={entry._id}
-                                className="max-w-[88%] rounded-2xl border border-border bg-card p-3 shadow-sm"
+                                className={`flex w-full ${entry.senderId === userId ? "justify-end" : "justify-start"}`}
                               >
+                                <div className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 shadow-sm md:max-w-[75%] ${entry.senderId === userId ? "rounded-tr-sm bg-[#d9fdd3]" : "rounded-tl-sm bg-white"}`}>
                                 <div className="flex justify-between gap-2 text-xs">
                                   <span className="font-semibold">
                                     {entry.senderName}
@@ -1084,7 +1085,7 @@ export function MessageMailbox({
                                     ? ` · ${entry.recipientRole}`
                                     : ""}
                                 </p>
-                                <p className="mt-2 whitespace-pre-wrap break-words text-sm">
+                                <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-800">
                                   {entry.body}
                                 </p>
                                 {entry.attachments &&
@@ -1097,10 +1098,11 @@ export function MessageMailbox({
                                         : "s"}
                                     </div>
                                   )}
+                                </div>
                               </article>
                             ))}
                           </div>
-                          <div className="flex justify-end border-t border-border bg-card p-3">
+                          <div className="flex justify-end border-t border-slate-200 bg-white p-3">
                             <Button
                               type="button"
                               size="sm"
