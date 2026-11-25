@@ -106,7 +106,7 @@ export const messageListQuerySchema = z
     toDate: z.coerce.date().optional(),
 
     sort: z.enum(["newest", "oldest"]).default("newest"),
-    participantType: z.enum(["RIDER"]).optional(),
+    participantType: z.enum(["RIDER", "ADMIN_EMPLOYEE"]).optional(),
   })
   .refine(
     (query) =>
@@ -124,6 +124,14 @@ export const messageRecipientsQuerySchema = z.object({
   accountType: z
     .enum(["OWNER", "ADMIN", "EMPLOYEE", "SELLER", "RIDER"])
     .optional(),
+
+  accountTypes: z.preprocess(
+    (value) =>
+      typeof value === "string"
+        ? value.split(",").map((item) => item.trim()).filter(Boolean)
+        : value,
+    z.array(z.enum(["ADMIN", "EMPLOYEE"])).optional(),
+  ),
 });
 
 /*

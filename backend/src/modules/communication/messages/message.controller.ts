@@ -219,6 +219,12 @@ export const getMessageRecipientsController = async (
       req.query.accountType === "RIDER"
         ? req.query.accountType
         : undefined,
+    accountTypes:
+      typeof req.query.accountTypes === "string"
+        ? req.query.accountTypes.split(",").map((item) => item.trim())
+            .filter((item): item is "ADMIN" | "EMPLOYEE" =>
+              item === "ADMIN" || item === "EMPLOYEE")
+        : undefined,
   });
 
   res.status(200).json({
@@ -264,7 +270,9 @@ export const getMessageInboxController = async (
         ? req.query.sort
         : undefined,
     participantType:
-      req.query.participantType === "RIDER" ? "RIDER" : undefined,
+      req.query.participantType === "RIDER" || req.query.participantType === "ADMIN_EMPLOYEE"
+        ? req.query.participantType
+        : undefined,
   });
 
   res.status(200).json({
@@ -310,7 +318,9 @@ export const getSentMessagesController = async (
         ? req.query.sort
         : undefined,
     participantType:
-      req.query.participantType === "RIDER" ? "RIDER" : undefined,
+      req.query.participantType === "RIDER" || req.query.participantType === "ADMIN_EMPLOYEE"
+        ? req.query.participantType
+        : undefined,
   });
 
   res.status(200).json({

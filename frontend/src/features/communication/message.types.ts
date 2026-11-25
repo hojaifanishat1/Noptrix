@@ -52,7 +52,7 @@ export interface MessageListQuery {
   fromDate?: string;
   toDate?: string;
   sort?: "newest" | "oldest";
-  participantType?: "RIDER";
+  participantType?: "RIDER" | "ADMIN_EMPLOYEE";
 }
 
 export interface MessageListResult {
@@ -89,6 +89,7 @@ export interface MessageRecipientQuery {
   limit?: number;
   search?: string;
   accountType?: MessageRecipientType;
+  accountTypes?: string;
 }
 
 export interface MessageRecipientListResult {

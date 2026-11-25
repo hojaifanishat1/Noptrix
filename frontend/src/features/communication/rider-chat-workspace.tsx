@@ -60,7 +60,7 @@ function dateLabel(value?: string) {
   });
 }
 
-export function RiderChatWorkspace({ mode }: { mode: Mode }) {
+export function RiderChatWorkspace({ mode, participantTypeFilter }: { mode: Mode; participantTypeFilter?: "RIDER" | "ADMIN_EMPLOYEE" }) {
   const authUser = useAuthStore((state) => state.user);
   const [riderId, setRiderId] = useState("");
   const [messages, setMessages] = useState<InternalMessage[]>([]);
@@ -88,7 +88,7 @@ export function RiderChatWorkspace({ mode }: { mode: Mode }) {
           ? await communicationApi.getInbox({
               page: 1,
               limit: 100,
-              participantType: "RIDER",
+              ...(participantTypeFilter ? { participantType: participantTypeFilter } : {}),
               sort: "newest",
             })
           : await riderMessagesApi.getInbox();
@@ -99,7 +99,7 @@ export function RiderChatWorkspace({ mode }: { mode: Mode }) {
     } finally {
       setLoading(false);
     }
-  }, [mode]);
+  }, [mode, participantTypeFilter]);
 
   useEffect(() => {
     if (mode === "rider") {
@@ -138,7 +138,9 @@ export function RiderChatWorkspace({ mode }: { mode: Mode }) {
   const filtered = conversations.filter((message) => {
     const otherName =
       mode === "admin"
-        ? message.recipientName
+        ? (message.senderId === authUser?.id
+            ? message.recipientName
+            : message.senderName)
         : message.senderName;
     const term = search.trim().toLowerCase();
     return (
@@ -176,7 +178,11 @@ export function RiderChatWorkspace({ mode }: { mode: Mode }) {
       void communicationApi.getRecipients({
         page: 1,
         limit: 100,
-        accountType: "RIDER",
+        ...(participantTypeFilter === "RIDER"
+          ? { accountType: "RIDER" as const }
+          : participantTypeFilter === "ADMIN_EMPLOYEE"
+            ? { accountTypes: "ADMIN,EMPLOYEE" }
+            : {}),
         ...(recipientSearch.trim()
           ? { search: recipientSearch.trim() }
           : {}),
@@ -192,7 +198,7 @@ export function RiderChatWorkspace({ mode }: { mode: Mode }) {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [showNewChat, mode, recipientSearch]);
+  }, [showNewChat, mode, recipientSearch, participantTypeFilter]);
 
   const sendMessage = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -204,11 +210,11 @@ export function RiderChatWorkspace({ mode }: { mode: Mode }) {
     try {
       if (showNewChat && mode === "admin") {
         if (!selectedRecipient) {
-          throw new Error("Select a rider first.");
+          throw new Error(participantTypeFilter === "RIDER" ? "Select a rider first." : "Select a recipient first.");
         }
         await communicationApi.create({
           recipientId: selectedRecipient.userId,
-          subject: "Rider conversation",
+          subject: participantTypeFilter === "RIDER" ? "Rider conversation" : "Conversation",
           body: text,
           priority: "NORMAL",
         });
@@ -250,7 +256,9 @@ export function RiderChatWorkspace({ mode }: { mode: Mode }) {
 
   const otherName = selectedConversation
     ? mode === "admin"
-      ? selectedConversation.recipientName
+      ? (selectedConversation.senderId === authUser?.id
+          ? selectedConversation.recipientName
+          : selectedConversation.senderName)
       : selectedConversation.senderName
     : "";
 
@@ -264,11 +272,13 @@ export function RiderChatWorkspace({ mode }: { mode: Mode }) {
             </span>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">
-                {mode === "admin" ? "Rider Messages" : "Messages"}
+                {mode === "admin" ? (participantTypeFilter === "RIDER" ? "Rider Messages" : "Messages") : "Messages"}
               </h1>
               <p className="text-sm text-slate-500">
                 {mode === "admin"
-                  ? "Direct conversations with your riders"
+                  ? participantTypeFilter === "RIDER"
+                    ? "Direct conversations with your riders"
+                    : "All your conversations across NOPTRIX"
                   : "Your conversations with NOPTRIX Admin"}
               </p>
             </div>
@@ -323,8 +333,16 @@ export function RiderChatWorkspace({ mode }: { mode: Mode }) {
               const active = selectedId === threadKey(message);
               const name =
                 mode === "admin"
-                  ? message.recipientName
+                  ? (message.senderId === authUser?.id
+                      ? message.recipientName
+                      : message.senderName)
                   : message.senderName;
+              const otherRole =
+                mode === "admin"
+                  ? (message.senderId === authUser?.id
+                      ? message.recipientRole
+                      : message.senderRole)
+                  : message.senderRole;
               const unread =
                 mode === "admin"
                   ? message.recipientId === authUser?.id &&
@@ -347,6 +365,9 @@ export function RiderChatWorkspace({ mode }: { mode: Mode }) {
                       <span className="truncate text-sm font-semibold text-slate-900">{name}</span>
                       <span className="shrink-0 text-[11px] text-slate-400">{dateLabel(message.createdAt)}</span>
                     </span>
+                    {otherRole && (
+                      <span className="mt-0.5 block truncate text-[11px] text-slate-500">{otherRole}</span>
+                    )}
                     <span className="mt-1 block truncate text-xs text-slate-500">{message.body}</span>
                   </span>
                   {unread && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500" />}
@@ -365,14 +386,14 @@ export function RiderChatWorkspace({ mode }: { mode: Mode }) {
                 </button>
                 <div>
                   <h2 className="font-semibold">Start a new chat</h2>
-                  <p className="text-xs text-slate-500">Choose an active rider</p>
+                  <p className="text-xs text-slate-500">{participantTypeFilter === "RIDER" ? "Choose an active rider" : "Choose a recipient"}</p>
                 </div>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
                 <input
                   value={recipientSearch}
                   onChange={(event) => setRecipientSearch(event.target.value)}
-                  placeholder="Search riders by name, email or phone"
+                  placeholder={participantTypeFilter === "RIDER" ? "Search riders by name, email or phone" : "Search people by name, email or phone"}
                   className="mb-3 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-500"
                 />
                 {recipientLoading && <p className="p-3 text-sm text-slate-500">Searching riders...</p>}
@@ -388,13 +409,18 @@ export function RiderChatWorkspace({ mode }: { mode: Mode }) {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold">{recipient.name}</span>
-                      <span className="block truncate text-xs text-slate-500">{recipient.email || recipient.profileName || "Rider"}</span>
+                      <span className="block truncate text-xs text-slate-600">
+                        {recipient.profileName || recipient.accountType}
+                      </span>
+                      {recipient.email && (
+                        <span className="block truncate text-[11px] text-slate-400">{recipient.email}</span>
+                      )}
                     </span>
                     {selectedRecipient?.userId === recipient.userId && <Check className="h-5 w-5 text-emerald-600" />}
                   </button>
                 ))}
                 {!recipientLoading && recipients.length === 0 && (
-                  <p className="p-4 text-center text-sm text-slate-500">No active riders found.</p>
+                  <p className="p-4 text-center text-sm text-slate-500">{participantTypeFilter === "RIDER" ? "No active riders found." : "No recipients found."}</p>
                 )}
               </div>
               {selectedRecipient && (
@@ -423,7 +449,7 @@ export function RiderChatWorkspace({ mode }: { mode: Mode }) {
                 </span>
                 <div className="min-w-0">
                   <h2 className="truncate font-semibold text-slate-900">{otherName}</h2>
-                  <p className="text-xs text-emerald-600">{mode === "admin" ? "Rider conversation" : "NOPTRIX Admin"}</p>
+                  <p className="text-xs text-emerald-600">{mode === "admin" ? (participantTypeFilter === "RIDER" ? "Rider conversation" : "NOPTRIX conversation") : "NOPTRIX Admin"}</p>
                 </div>
               </div>
 

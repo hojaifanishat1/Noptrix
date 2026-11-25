@@ -1,7 +1,7 @@
 "use client";
 
-import { MessageMailbox } from "@/features/communication/message-mailbox";
+import { RiderChatWorkspace } from "@/features/communication/rider-chat-workspace";
 
 export default function RiderMessagesPage() {
-  return <MessageMailbox recipientTypeFilter="RIDER" />;
+  return <RiderChatWorkspace mode="admin" participantTypeFilter="RIDER" />;
 }

@@ -16,7 +16,7 @@ import { Owner, OWNER_STATUSES } from "../../owners/owner.model";
 import { Admin, ADMIN_STATUSES } from "../../admins/admin.model";
 
 import { Seller } from "../../sellers/seller.model";
-import { Rider } from "../../riders/rider.model";
+import { Rider, type IRider } from "../../riders/rider.model";
 import { Employee, EMPLOYEE_STATUSES } from "../../employees/employee.model";
 import { Role } from "../../roles/role.model";
 
@@ -57,7 +57,7 @@ export interface MessageListServiceInput {
   fromDate?: Date;
   toDate?: Date;
   sort?: "newest" | "oldest";
-  participantType?: "RIDER";
+  participantType?: "RIDER" | "ADMIN_EMPLOYEE";
 }
 
 export interface MessageRecipientListInput {
@@ -66,6 +66,7 @@ export interface MessageRecipientListInput {
   readonly limit: number;
   readonly search?: string;
   readonly accountType?: "OWNER" | "ADMIN" | "EMPLOYEE" | "SELLER" | "RIDER";
+  readonly accountTypes?: Array<"ADMIN" | "EMPLOYEE">;
 }
 
 export interface MessageResponse extends Omit<
@@ -570,8 +571,15 @@ export const getMessageRecipients = async (
       }
     : {};
 
+  const matchesAccountType = (
+    type: "OWNER" | "ADMIN" | "EMPLOYEE" | "SELLER" | "RIDER",
+  ) =>
+    input.accountTypes
+      ? input.accountTypes.includes(type as "ADMIN" | "EMPLOYEE")
+      : !input.accountType || input.accountType === type;
+
   const [owners, admins, employees, sellers, riders] = await Promise.all([
-    input.accountType && input.accountType !== "OWNER"
+    !matchesAccountType("OWNER")
       ? Promise.resolve([])
       : Owner.find({
           status: OWNER_STATUSES.ACTIVE,
@@ -579,7 +587,7 @@ export const getMessageRecipients = async (
           .select("userId")
           .lean()
           .exec(),
-    input.accountType && input.accountType !== "ADMIN"
+    !matchesAccountType("ADMIN")
       ? Promise.resolve([])
       : Admin.find({
           status: ADMIN_STATUSES.ACTIVE,
@@ -587,7 +595,7 @@ export const getMessageRecipients = async (
           .select("userId")
           .lean()
           .exec(),
-    input.accountType && input.accountType !== "EMPLOYEE"
+    !matchesAccountType("EMPLOYEE")
       ? Promise.resolve([])
       : Employee.find({
           status: EMPLOYEE_STATUSES.ACTIVE,
@@ -595,7 +603,7 @@ export const getMessageRecipients = async (
           .select("userId department jobTitle")
           .lean()
           .exec(),
-    input.accountType && input.accountType !== "SELLER"
+    !matchesAccountType("SELLER")
       ? Promise.resolve([])
       : Seller.find({
           status: "ACTIVE",
@@ -604,7 +612,7 @@ export const getMessageRecipients = async (
           .select("_id businessName email")
           .lean()
           .exec(),
-    input.accountType && input.accountType !== "RIDER"
+    !matchesAccountType("RIDER")
       ? Promise.resolve([])
       : Rider.find({
           status: "ACTIVE",
@@ -666,8 +674,16 @@ export const getMessageRecipients = async (
   // Rider accounts are independent accounts; do not require a User document.
   if (input.accountType === "RIDER") {
     const riderFilter = {
-      status: "ACTIVE",
-      ...profileSearch,
+      status: "ACTIVE" as const,
+      ...(escapedSearch
+        ? {
+            $or: [
+              { name: { $regex: escapedSearch, $options: "i" } },
+              { email: { $regex: escapedSearch, $options: "i" } },
+              { phone: { $regex: escapedSearch, $options: "i" } },
+            ],
+          }
+        : {}),
     };
 
     const skip = (input.page - 1) * input.limit;
@@ -1011,6 +1027,39 @@ const applyParticipantTypeFilter = async (
   filter: Record<string, unknown>,
   input: MessageListServiceInput,
 ): Promise<void> => {
+  if (input.participantType === "ADMIN_EMPLOYEE") {
+    const [admins, employees] = await Promise.all([
+      Admin.find({}).select("userId").lean().exec(),
+      Employee.find({}).select("userId").lean().exec(),
+    ]);
+
+    const participantIds = [
+      ...new Set([
+        ...admins.map((item) => item.userId.toString()),
+        ...employees.map((item) => item.userId.toString()),
+      ]),
+    ].map((id) => new Types.ObjectId(id));
+
+    const conditions = Array.isArray(filter.$and) ? filter.$and : [];
+    if (filter.$or) {
+      conditions.push({ $or: filter.$or });
+      delete filter.$or;
+    }
+
+    conditions.push(
+      participantIds.length
+        ? {
+            $or: [
+              { senderId: { $in: participantIds } },
+              { recipientId: { $in: participantIds } },
+            ],
+          }
+        : { _id: { $exists: false } },
+    );
+    filter.$and = conditions;
+    return;
+  }
+
   if (input.participantType !== "RIDER") return;
 
   const riders = await Rider.find({})
