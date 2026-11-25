@@ -389,7 +389,7 @@ export function MessageMailbox({
 
   return (
     <AdminAuthGuard>
-      <main className="mx-auto w-full max-w-6xl space-y-6 p-4 md:p-6">
+      <main className="mx-auto w-full max-w-[1600px] space-y-4 p-2 md:p-5">
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="rounded-xl bg-primary/10 p-3 text-primary">
@@ -792,10 +792,10 @@ export function MessageMailbox({
               </Select>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[190px_minmax(0,1fr)]">
+            <div className="grid gap-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:grid-cols-[190px_minmax(0,1fr)]">
               <nav
                 aria-label="Message folders"
-                className="space-y-1 border-b border-border pb-3 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-3"
+                className="space-y-1 border-b border-border bg-muted/20 p-3 lg:border-b-0 lg:border-r lg:p-4"
               >
                 {(
                   [
@@ -849,9 +849,9 @@ export function MessageMailbox({
                     </p>
                   </div>
                 ) : (
-                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
-                    <div className="min-w-0 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2 rounded-lg bg-muted/50 p-3">
+                  <div className="grid min-w-0 gap-0 xl:grid-cols-[minmax(280px,0.9fr)_minmax(360px,1.1fr)]">
+                    <div className="min-w-0 space-y-0 border-border xl:border-r">
+                      <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/30 p-3">
                         <label className="mr-auto flex items-center gap-2 text-sm">
                           <input
                             type="checkbox"
@@ -911,16 +911,16 @@ export function MessageMailbox({
                       {conversations.map((message) => (
                         <article
                           key={message._id}
-                          className={`rounded-lg border transition-colors ${
+                          className={`border-b border-border transition-colors ${
                             previewMessageId === message._id
-                              ? "border-primary/40 bg-primary/[0.04]"
+                              ? "border-l-4 border-l-primary bg-primary/10"
                               : message.recipientId === userId &&
                                   message.status === "SENT"
-                                ? "border-primary/20 bg-primary/[0.02]"
-                                : "border-border hover:bg-muted/40"
+                                ? "border-l-4 border-l-primary/50 bg-primary/[0.04]"
+                                : "border-l-4 border-l-transparent hover:bg-muted/50"
                           }`}
                         >
-                          <div className="flex items-center gap-2 px-3 py-2.5">
+                          <div className="flex items-center gap-2 px-3 py-4 hover:bg-muted/30">
                             <input
                               type="checkbox"
                               aria-label={`Select ${message.subject}`}
@@ -1032,14 +1032,14 @@ export function MessageMailbox({
                         </article>
                       ))}
                     </div>
-                    <aside className="hidden min-h-[420px] rounded-xl border border-border lg:block">
+                    <aside className="flex min-h-[520px] flex-col overflow-hidden bg-muted/10">
                       {previewLoading ? (
                         <p className="p-8 text-center text-sm text-muted-foreground">
                           Loading conversation...
                         </p>
                       ) : previewThread.length > 0 ? (
                         <div className="flex h-full flex-col">
-                          <div className="border-b border-border p-4">
+                          <div className="border-b border-border bg-card p-4">
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <h2 className="font-semibold">
@@ -1059,11 +1059,11 @@ export function MessageMailbox({
                               </Link>
                             </div>
                           </div>
-                          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+                          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[radial-gradient(circle_at_1px_1px,hsl(var(--border))_1px,transparent_0)] [background-size:22px_22px] p-4 md:p-6">
                             {previewThread.map((entry) => (
                               <article
                                 key={entry._id}
-                                className="rounded-lg border border-border p-3"
+                                className="max-w-[88%] rounded-2xl border border-border bg-card p-3 shadow-sm"
                               >
                                 <div className="flex justify-between gap-2 text-xs">
                                   <span className="font-semibold">
@@ -1100,7 +1100,7 @@ export function MessageMailbox({
                               </article>
                             ))}
                           </div>
-                          <div className="flex justify-end border-t border-border p-3">
+                          <div className="flex justify-end border-t border-border bg-card p-3">
                             <Button
                               type="button"
                               size="sm"

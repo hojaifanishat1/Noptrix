@@ -13,6 +13,7 @@ const navigation = [
   { label: "Orders", href: ROUTES.RIDER_ORDERS },
   { label: "Deliveries", href: ROUTES.RIDER_DELIVERIES },
   { label: "Earnings", href: ROUTES.RIDER_EARNINGS },
+  { label: "Messages", href: ROUTES.RIDER_MESSAGES },
   { label: "Notifications", href: ROUTES.RIDER_NOTIFICATIONS },
   { label: "Profile", href: ROUTES.RIDER_PROFILE },
   { label: "Settings", href: ROUTES.RIDER_SETTINGS },

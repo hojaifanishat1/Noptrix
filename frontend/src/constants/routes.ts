@@ -172,6 +172,7 @@ export const ROUTES = {
     RIDER_DELIVERIES: "/rider-panel/deliveries",
     RIDER_ORDERS: "/rider-panel/orders",
     RIDER_EARNINGS: "/rider-panel/earnings",
+    RIDER_MESSAGES: "/rider-panel/messages",
 
     RIDER_NOTIFICATIONS: "/rider-panel/notifications",
     RIDER_PROFILE: "/rider-panel/profile",
