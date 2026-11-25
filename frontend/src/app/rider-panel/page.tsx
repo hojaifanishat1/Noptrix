@@ -45,6 +45,56 @@ export default function RiderDashboardPage() {
     };
   }, []);
 
+  // Keep GPS fresh while the rider is online and the dashboard is visible.
+  // If the app closes or GPS stops, the backend expires availability after 5 minutes.
+  useEffect(() => {
+    if (profile?.isAvailable !== true) return;
+
+    let active = true;
+
+    const sendLocation = () => {
+      if (
+        !active ||
+        document.visibilityState !== "visible" ||
+        !navigator.geolocation
+      ) {
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          if (!active) return;
+
+          void riderAuthApi.updateLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          }).catch(() => {
+            // Backend stale-location timeout remains the safety fallback.
+          });
+        },
+        () => {
+          // A failed GPS read will eventually make the rider go offline.
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 10000,
+        },
+      );
+    };
+
+    sendLocation();
+
+    const intervalId = window.setInterval(sendLocation, 60_000);
+    document.addEventListener("visibilitychange", sendLocation);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", sendLocation);
+    };
+  }, [profile?.isAvailable]);
+
   const updateAvailability = async (available: boolean) => {
     setWorking(true);
     setError("");

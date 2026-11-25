@@ -69,7 +69,11 @@ function formatDate(value: string): string {
   return Number.isNaN(date.getTime()) ? "Unknown date" : date.toLocaleString();
 }
 
-export function MessageMailbox() {
+export function MessageMailbox({
+  recipientTypeFilter,
+}: {
+  recipientTypeFilter?: MessageRecipientType;
+} = {}) {
   const userId = useAuthStore((state) => state.user?.id);
   const [folder, setFolder] = useState<
     "inbox" | "unread" | "archived" | "trash"
@@ -107,8 +111,9 @@ export function MessageMailbox() {
   const [recipients, setRecipients] = useState<MessageRecipient[]>([]);
   const [recipientSearch, setRecipientSearch] = useState("");
   const [recipientType, setRecipientType] = useState<"" | MessageRecipientType>(
-    "",
+    recipientTypeFilter ?? "",
   );
+  const effectiveRecipientType = recipientTypeFilter ?? recipientType;
   const [recipientsLoading, setRecipientsLoading] = useState(false);
   const [recipientsError, setRecipientsError] = useState("");
   const [subject, setSubject] = useState("");
@@ -131,6 +136,9 @@ export function MessageMailbox() {
 
     try {
       const params: MessageListQuery = { page, limit: PAGE_SIZE };
+      if (recipientTypeFilter === "RIDER") {
+        params.participantType = "RIDER";
+      }
       if (search) params.search = search;
       if (status) params.status = status;
       else if (folder === "archived") params.status = "ARCHIVED";
@@ -163,6 +171,7 @@ export function MessageMailbox() {
     status,
     toDate,
     unreadOnly,
+    recipientTypeFilter,
   ]);
 
   useEffect(() => {
@@ -225,7 +234,9 @@ export function MessageMailbox() {
           page: 1,
           limit: 100,
           ...(recipientSearch.trim() ? { search: recipientSearch.trim() } : {}),
-          ...(recipientType ? { accountType: recipientType } : {}),
+          ...(effectiveRecipientType
+            ? { accountType: effectiveRecipientType }
+            : {}),
         })
         .then((result) => {
           if (active) setRecipients(result.recipients);
@@ -246,7 +257,7 @@ export function MessageMailbox() {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [recipientSearch, recipientType, replyTo, showCompose]);
+  }, [recipientSearch, effectiveRecipientType, replyTo, showCompose]);
 
   const submitCompose = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -385,9 +396,13 @@ export function MessageMailbox() {
               <Mail className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Messages</h1>
+              <h1 className="text-2xl font-bold">
+                {recipientTypeFilter === "RIDER" ? "Rider Messages" : "Messages"}
+              </h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                One mailbox for your inbox, sent conversations, and replies.
+                {recipientTypeFilter === "RIDER"
+                  ? "Manage conversations and replies with riders."
+                  : "One mailbox for your inbox, sent conversations, and replies."}
               </p>
             </div>
           </div>
@@ -463,7 +478,8 @@ export function MessageMailbox() {
                       </label>
                       <Select
                         id="recipientType"
-                        value={recipientType}
+                        value={effectiveRecipientType}
+                        disabled={Boolean(recipientTypeFilter)}
                         onChange={(event) =>
                           setRecipientType(
                             event.target.value as "" | MessageRecipientType,

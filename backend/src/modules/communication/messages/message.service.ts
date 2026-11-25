@@ -57,6 +57,7 @@ export interface MessageListServiceInput {
   fromDate?: Date;
   toDate?: Date;
   sort?: "newest" | "oldest";
+  participantType?: "RIDER";
 }
 
 export interface MessageRecipientListInput {
@@ -493,7 +494,15 @@ const assertCanMessage = async (
 
   await assertActiveAdministrativeSender(senderId);
 
-  await validateActiveUser(recipientId);
+  const directRider = await Rider.exists({
+    _id: recipientId,
+    status: "ACTIVE",
+  });
+
+  // Rider accounts authenticate with Rider._id and may not have a User record.
+  if (!directRider) {
+    await validateActiveUser(recipientId);
+  }
 
   const [recipientOwner, recipientAdmin, employee, seller, rider] =
     await Promise.all([
@@ -514,7 +523,7 @@ const assertCanMessage = async (
         status: "ACTIVE",
       }),
       Rider.exists({
-        userId: recipientId,
+        $or: [{ _id: recipientId }, { userId: recipientId }],
         status: "ACTIVE",
       }),
     ]);
@@ -653,6 +662,40 @@ export const getMessageRecipients = async (
 
   accountTypes.delete(senderObjectId.toString());
   profiles.delete(senderObjectId.toString());
+
+  // Rider accounts are independent accounts; do not require a User document.
+  if (input.accountType === "RIDER") {
+    const riderFilter = {
+      status: "ACTIVE",
+      ...profileSearch,
+    };
+
+    const skip = (input.page - 1) * input.limit;
+    const [activeRiders, total] = await Promise.all([
+      Rider.find(riderFilter)
+        .select("_id name email")
+        .sort({ name: 1, _id: 1 })
+        .skip(skip)
+        .limit(input.limit)
+        .lean()
+        .exec(),
+      Rider.countDocuments(riderFilter).exec(),
+    ]);
+
+    return {
+      recipients: activeRiders.map((rider) => ({
+        userId: rider._id.toString(),
+        name: rider.name,
+        ...(rider.email ? { email: rider.email } : {}),
+        accountType: "RIDER" as const,
+        profileName: rider.name,
+      })),
+      page: input.page,
+      limit: input.limit,
+      total,
+      totalPages: Math.ceil(total / input.limit),
+    };
+  }
 
   const recipientIds = [...accountTypes.keys()].map(
     (userId) => new Types.ObjectId(userId),
@@ -964,6 +1007,47 @@ export const markMessageAsUnread = async (
 |--------------------------------------------------------------------------
 */
 
+const applyParticipantTypeFilter = async (
+  filter: Record<string, unknown>,
+  input: MessageListServiceInput,
+): Promise<void> => {
+  if (input.participantType !== "RIDER") return;
+
+  const riders = await Rider.find({})
+    .select("_id userId")
+    .lean()
+    .exec();
+
+  const participantIds = [
+    ...new Set(
+      riders.flatMap((rider) => [
+        rider._id.toString(),
+        ...(rider.userId ? [rider.userId.toString()] : []),
+      ]),
+    ),
+  ].map((id) => new Types.ObjectId(id));
+
+  const conditions = Array.isArray(filter.$and) ? filter.$and : [];
+
+  if (filter.$or) {
+    conditions.push({ $or: filter.$or });
+    delete filter.$or;
+  }
+
+  conditions.push(
+    participantIds.length
+      ? {
+          $or: [
+            { senderId: { $in: participantIds } },
+            { recipientId: { $in: participantIds } },
+          ],
+        }
+      : { _id: { $exists: false } },
+  );
+
+  filter.$and = conditions;
+};
+
 export const getInbox = async (
   input: MessageListServiceInput,
 ): Promise<{
@@ -990,6 +1074,7 @@ export const getInbox = async (
         ],
   };
 
+  await applyParticipantTypeFilter(filter, input);
   applyMessageListFilters(filter, input);
 
   const { messages, total } = await getConversationPage(filter, input);
@@ -1031,6 +1116,7 @@ export const getSentMessages = async (
     },
   };
 
+  await applyParticipantTypeFilter(filter, input);
   applyMessageListFilters(filter, input);
 
   const { messages, total } = await getConversationPage(filter, input);

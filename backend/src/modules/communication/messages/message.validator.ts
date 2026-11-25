@@ -106,6 +106,7 @@ export const messageListQuerySchema = z
     toDate: z.coerce.date().optional(),
 
     sort: z.enum(["newest", "oldest"]).default("newest"),
+    participantType: z.enum(["RIDER"]).optional(),
   })
   .refine(
     (query) =>

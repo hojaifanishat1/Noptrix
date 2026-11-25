@@ -263,6 +263,8 @@ export const getMessageInboxController = async (
       req.query.sort === "oldest" || req.query.sort === "newest"
         ? req.query.sort
         : undefined,
+    participantType:
+      req.query.participantType === "RIDER" ? "RIDER" : undefined,
   });
 
   res.status(200).json({
@@ -307,6 +309,8 @@ export const getSentMessagesController = async (
       req.query.sort === "oldest" || req.query.sort === "newest"
         ? req.query.sort
         : undefined,
+    participantType:
+      req.query.participantType === "RIDER" ? "RIDER" : undefined,
   });
 
   res.status(200).json({

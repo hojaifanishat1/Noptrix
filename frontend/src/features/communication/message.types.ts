@@ -52,6 +52,7 @@ export interface MessageListQuery {
   fromDate?: string;
   toDate?: string;
   sort?: "newest" | "oldest";
+  participantType?: "RIDER";
 }
 
 export interface MessageListResult {

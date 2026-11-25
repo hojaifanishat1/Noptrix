@@ -159,8 +159,8 @@ export default function OwnerRidersPage() {
   const [error, setError] = useState("");
   const [actionId, setActionId] = useState("");
 
-  const loadRiders = useCallback(async () => {
-    setLoading(true);
+  const loadRiders = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError("");
 
     try {
@@ -190,12 +190,18 @@ export default function OwnerRidersPage() {
       setRiders([]);
       setPagination(EMPTY_PAGINATION);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [page, search, status, type]);
 
   useEffect(() => {
     void loadRiders();
+
+    const intervalId = window.setInterval(() => {
+      void loadRiders(true);
+    }, 30_000);
+
+    return () => window.clearInterval(intervalId);
   }, [loadRiders]);
 
   const changeStatus = async (
