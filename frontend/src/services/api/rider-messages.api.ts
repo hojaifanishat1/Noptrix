@@ -13,6 +13,14 @@ function id(value: string) {
 }
 
 export const riderMessagesApi = {
+  async create(body: string): Promise<InternalMessage> {
+    const response = await apiClient.post<ApiResponse<InternalMessage>>(
+      BASE,
+      { body },
+    );
+    return response.data.data;
+  },
+
   async getInbox(): Promise<MessageListResult> {
     const response = await apiClient.get<ApiResponse<MessageListResult>>(
       `${BASE}/inbox`,

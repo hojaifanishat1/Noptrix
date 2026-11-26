@@ -118,7 +118,8 @@ export const createRateLimiter = (
 export const globalRateLimiter = createRateLimiter(
   {
     windowMs: 15 * 60 * 1000,
-    limit: 300,
+    // Shared Codespaces proxy IPs and dashboard polling need a larger API quota.
+    limit: 5000,
   },
   "global",
 );

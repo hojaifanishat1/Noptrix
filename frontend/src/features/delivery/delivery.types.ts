@@ -25,6 +25,8 @@ export interface DeliveryRecord {
   address: string;
   city: string;
   deliveryFee: number;
+  riderEarningAmount?: number;
+  riderEarningCurrency?: string;
   currency: string;
   assignedAt?: string;
   deliveredAt?: string;

@@ -5,6 +5,7 @@ import { logger } from "../../utils/logger";
 import { dispatchAutomationEvent } from "../automation/automation.service";
 import { Delivery } from "./delivery.model";
 import { Rider } from "../riders/rider.model";
+import { RiderEarning } from "../rider-earnings/riderEarning.model";
 
 import type { DeliveryStatus } from "./delivery.types";
 
@@ -121,7 +122,7 @@ export class DeliveryService {
     return delivery;
   }
 
-  static async assignRider(id: string, riderId: string) {
+  static async assignRider(id: string, riderId: string, riderEarningAmount: number) {
     const delivery = await Delivery.findById(id);
 
     if (!delivery) {
@@ -165,7 +166,16 @@ export class DeliveryService {
       );
     }
 
+    if (!Number.isFinite(riderEarningAmount) || riderEarningAmount <= 0) {
+      throw new DeliveryServiceError(
+        "A positive rider earning amount is required",
+        400,
+      );
+    }
+
     delivery.riderId = new Types.ObjectId(riderId);
+    delivery.riderEarningAmount = riderEarningAmount;
+    delivery.riderEarningCurrency = "BDT";
     delivery.status = "assigned";
     delivery.assignedAt = new Date();
     delivery.failureReason = undefined;
@@ -294,6 +304,35 @@ export class DeliveryService {
       },
       "Delivery status updated",
     );
+
+    if (input.status === "delivered" && delivery.riderId) {
+      const earningAmount = Number(delivery.riderEarningAmount ?? 0);
+
+      if (earningAmount <= 0) {
+        throw new DeliveryServiceError(
+          "Rider earning amount was not set for this delivery",
+          409,
+        );
+      }
+
+      await RiderEarning.findOneAndUpdate(
+        { sourceDeliveryId: delivery._id },
+        {
+          $setOnInsert: {
+            sourceDeliveryId: delivery._id,
+            riderId: delivery.riderId,
+            orderId: delivery.orderId,
+            type: "DELIVERY",
+            amount: earningAmount,
+            currency: delivery.riderEarningCurrency ?? "BDT",
+            status: "PENDING",
+            description: `Delivery earning — ${delivery.deliveryNumber}`,
+            earningDate: delivery.deliveredAt ?? now,
+          },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      );
+    }
 
     if (input.status === "delivered") {
       await dispatchAutomationEvent(

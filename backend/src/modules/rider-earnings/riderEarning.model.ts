@@ -35,6 +35,7 @@ export interface IRiderEarning {
   riderId: Types.ObjectId;
 
   orderId?: Types.ObjectId;
+  sourceDeliveryId?: Types.ObjectId;
 
   payoutId?: Types.ObjectId;
 
@@ -90,6 +91,12 @@ const riderEarningSchema = new Schema<IRiderEarning>(
       index: true,
     },
 
+    sourceDeliveryId: {
+      type: Schema.Types.ObjectId,
+      ref: "Delivery",
+      default: undefined,
+    },
+
     payoutId: {
       type: Schema.Types.ObjectId,
       ref: "RiderPayout",
@@ -115,7 +122,7 @@ const riderEarningSchema = new Schema<IRiderEarning>(
       required: true,
       trim: true,
       uppercase: true,
-      default: "SAR",
+      default: "BDT",
       maxlength: 3,
     },
 
@@ -214,6 +221,16 @@ riderEarningSchema.index({
   orderId: 1,
   type: 1,
 });
+
+riderEarningSchema.index(
+  { sourceDeliveryId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      sourceDeliveryId: { $type: "objectId" },
+    },
+  },
+);
 
 riderEarningSchema.index({
   status: 1,

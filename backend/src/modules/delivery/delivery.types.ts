@@ -40,6 +40,8 @@ export interface IDelivery {
   city: string;
 
   deliveryFee: number;
+  riderEarningAmount?: number;
+  riderEarningCurrency?: string;
   currency: string;
 
   assignedAt?: Date;

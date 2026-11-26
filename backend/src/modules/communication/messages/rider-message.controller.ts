@@ -4,6 +4,7 @@ import { asyncHandler } from "../../../utils/asyncHandler";
 import { getAuthenticatedRiderId } from "../../../middlewares/riderAuth.middleware";
 import {
   createMessageReply,
+  createRiderSupportMessage,
   getInbox,
   getMessageThread,
   getUnreadMessageCount,
@@ -13,6 +14,21 @@ const getMessageId = (req: Request): string => {
   const value = req.params.messageId;
   return Array.isArray(value) ? value[0] : value;
 };
+
+export const createRiderSupportMessageController = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const message = await createRiderSupportMessage(
+      getAuthenticatedRiderId(req),
+      req.body.body,
+    );
+
+    res.status(201).json({
+      success: true,
+      message: "Message sent to NOPTRIX Support successfully.",
+      data: message,
+    });
+  },
+);
 
 export const getRiderMessageInboxController = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {

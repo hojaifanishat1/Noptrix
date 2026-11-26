@@ -22,6 +22,7 @@ import {
   updateTrackingStatusController,
   assignRiderController,
   updateMyTrackingLocationController,
+  getMyTrackingController,
 } from "./tracking.controller";
 
 import {
@@ -42,6 +43,14 @@ const router = Router();
 |--------------------------------------------------------------------------
 */
 
+router.get(
+  "/me",
+  riderAuth,
+  requireRiderOnboardingCompleted,
+  validate(trackingQuerySchema, "query"),
+  getMyTrackingController,
+);
+
 router.patch(
   "/:trackingId/location",
   riderAuth,
@@ -49,6 +58,7 @@ router.patch(
   validate(trackingIdParamSchema, "params"),
   validate(updateTrackingLocationSchema, "body"),
   updateMyTrackingLocationController,
+  getMyTrackingController,
 );
 
 /*

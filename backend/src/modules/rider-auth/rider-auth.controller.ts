@@ -286,6 +286,10 @@ export const getMe = asyncHandler(
         onboardingStatus: rider.onboardingStatus,
         vehicleType: rider.vehicleType,
         vehicleNumber: rider.vehicleNumber,
+        isAvailable: rider.isAvailable,
+        currentLatitude: rider.currentLatitude,
+        currentLongitude: rider.currentLongitude,
+        lastLocationAt: rider.lastLocationAt,
       },
     });
   },

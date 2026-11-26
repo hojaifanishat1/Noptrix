@@ -103,7 +103,7 @@ const ensureRiderExists = async (riderId: string): Promise<void> => {
 };
 
 const normalizeCurrency = (currency?: string): string => {
-  return (currency ?? "SAR").trim().toUpperCase();
+  return (currency ?? "BDT").trim().toUpperCase();
 };
 
 const getAllowedStatusTransitions = (
@@ -487,7 +487,7 @@ export const deleteRiderEarning = async (earningId: string): Promise<void> => {
 
 export const getRiderEarningSummary = async (
   riderId: string,
-  currency = "SAR",
+  currency = "BDT",
 ): Promise<RiderEarningSummary> => {
   const riderObjectId = ensureObjectId(riderId, "rider ID");
 

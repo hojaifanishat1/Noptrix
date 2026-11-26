@@ -53,7 +53,7 @@ export const createRiderEarningSchema = z.object({
 
   amount: z.number().nonnegative(),
 
-  currency: currencySchema.default("SAR"),
+  currency: currencySchema.default("BDT"),
 
   description: z.string().trim().max(500).optional(),
 

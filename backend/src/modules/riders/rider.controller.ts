@@ -212,7 +212,15 @@ export const updateMyRiderLocationController = asyncHandler(
 
     res.status(200).json(
       ApiResponse.ok(
-        rider,
+        {
+          riderId: rider._id.toString(),
+          riderStatus: rider.status,
+          onboardingStatus: rider.onboardingStatus,
+          isAvailable: rider.isAvailable,
+          currentLatitude: rider.currentLatitude,
+          currentLongitude: rider.currentLongitude,
+          lastLocationAt: rider.lastLocationAt,
+        },
         "Rider location updated successfully.",
       ).serialize(),
     );

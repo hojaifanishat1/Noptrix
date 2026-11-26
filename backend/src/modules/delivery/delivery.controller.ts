@@ -84,6 +84,7 @@ export class DeliveryController {
       const delivery = await DeliveryService.assignRider(
         parsed.params.id,
         parsed.body.riderId,
+        parsed.body.riderEarningAmount,
       );
 
       return res.status(200).json({
@@ -166,7 +167,7 @@ export class DeliveryController {
 
   static async myDeliveries(req: Request, res: Response, next: NextFunction) {
     try {
-      const riderId = getActorId(req);
+      const riderId = req.riderAuth?.riderId;
 
       if (!riderId) {
         return res.status(401).json({

@@ -11,6 +11,7 @@ import {
 
 import {
   createRiderMessageReplyController,
+  createRiderSupportMessageController,
   getRiderMessageInboxController,
   getRiderMessageThreadController,
   getRiderUnreadMessageCountController,
@@ -19,6 +20,12 @@ import {
 const router = Router();
 
 router.use(riderAuth);
+
+router.post(
+  "/",
+  validateRequest({ body: messageReplySchema }),
+  createRiderSupportMessageController,
+);
 
 router.get(
   "/inbox",

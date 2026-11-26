@@ -183,8 +183,11 @@ export const deliveryAdminApi = {
     get: (id: string) => getOne<DeliveryRecord>(`/delivery/${id}`),
     create: (input: Record<string, unknown>) =>
       createOne<DeliveryRecord>("/delivery", input),
-    assignRider: (id: string, riderId: string) =>
-      updateOne<DeliveryRecord>(`/delivery/${id}/assign-rider`, { riderId }),
+    assignRider: (id: string, riderId: string, riderEarningAmount: number) =>
+      updateOne<DeliveryRecord>(`/delivery/${id}/assign-rider`, {
+        riderId,
+        riderEarningAmount,
+      }),
     updateStatus: (id: string, input: Record<string, unknown>) =>
       updateOne<DeliveryRecord>(`/delivery/${id}/status`, input),
     cancel: (id: string, reason: string) =>

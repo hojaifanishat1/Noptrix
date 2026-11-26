@@ -26,7 +26,10 @@ export const createDeliverySchema = z.object({
 
 export const assignRiderSchema = z.object({
   params: z.object({ id: objectId }),
-  body: z.object({ riderId: objectId }),
+  body: z.object({
+    riderId: objectId,
+    riderEarningAmount: z.number().finite().positive(),
+  }),
 });
 
 export const updateDeliveryStatusSchema = z.object({

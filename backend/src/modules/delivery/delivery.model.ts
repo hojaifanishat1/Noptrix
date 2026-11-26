@@ -134,6 +134,20 @@ const deliverySchema = new Schema<IDelivery>(
       default: "BDT",
     },
 
+    riderEarningAmount: {
+      type: Number,
+      min: 0,
+    },
+
+    riderEarningCurrency: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      minlength: 3,
+      maxlength: 3,
+      default: "BDT",
+    },
+
     assignedAt: {
       type: Date,
     },

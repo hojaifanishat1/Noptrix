@@ -157,7 +157,10 @@ export const getTrackingByOrderId = async (orderId: string) => {
 |--------------------------------------------------------------------------
 */
 
-export const getAllTracking = async (query: TrackingQueryInput) => {
+export const getAllTracking = async (
+  query: TrackingQueryInput,
+  includeOrderDetails = false,
+) => {
   const page = query.page ?? 1;
 
   const limit = query.limit ?? 20;
@@ -178,12 +181,19 @@ export const getAllTracking = async (query: TrackingQueryInput) => {
     filter.orderId = validateObjectId(query.orderId, "order ID");
   }
 
+  const trackingQuery = Tracking.find(filter)
+    .populate("riderId", "name email phone riderCode status");
+
+  if (includeOrderDetails) {
+    trackingQuery.populate(
+      "orderId",
+      "orderNumber status fulfillmentStatus shippingAddress items.productName items.quantity createdAt deliveredAt",
+    );
+  }
+
   const [trackings, total] = await Promise.all([
-    Tracking.find(filter)
-      .populate("riderId", "name email phone riderCode status")
-      .sort({
-        createdAt: -1,
-      })
+    trackingQuery
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),

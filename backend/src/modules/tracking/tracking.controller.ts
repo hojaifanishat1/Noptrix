@@ -16,6 +16,7 @@ import {
   UpdateTrackingStatusInput,
   UpdateTrackingLocationInput,
   TrackingQueryInput,
+  trackingQuerySchema,
 } from "./tracking.validator";
 
 import {
@@ -210,6 +211,34 @@ export const assignRiderController = asyncHandler(
       .json(
         ApiResponse.ok(tracking, "Rider assigned successfully.").serialize(),
       );
+  },
+);
+
+/* 
+|-------------------------------------------------------------------------- 
+| RIDER — Own Assigned Tracking
+|-------------------------------------------------------------------------- 
+*/
+
+export const getMyTrackingController = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const riderId = getAuthenticatedRiderId(req);
+    const query = trackingQuerySchema.parse(req.query);
+
+    const result = await getAllTracking(
+      {
+        ...query,
+        riderId,
+      },
+      true,
+    );
+
+    res.status(200).json(
+      ApiResponse.ok(
+        result,
+        "Your assigned deliveries retrieved successfully.",
+      ).serialize(),
+    );
   },
 );
 

@@ -297,6 +297,7 @@ export default function DeliveryWorkspace({
   const [activeRiders, setActiveRiders] = useState<ActiveRiderOption[]>([]);
   const [riderSearch, setRiderSearch] = useState("");
   const [selectedRiderId, setSelectedRiderId] = useState("");
+  const [riderEarningAmount, setRiderEarningAmount] = useState("");
   const [ridersLoading, setRidersLoading] = useState(false);
   const [riderSaving, setRiderSaving] = useState(false);
 
@@ -567,6 +568,7 @@ export default function DeliveryWorkspace({
     setActiveRiders([]);
     setRiderSearch("");
     setSelectedRiderId("");
+    setRiderEarningAmount("");
     setError("");
     setSuccess("");
     setRidersLoading(true);
@@ -584,6 +586,12 @@ export default function DeliveryWorkspace({
   const confirmRiderAssignment = async () => {
     if (!riderModalItem || !selectedRiderId) return;
 
+    const earningAmount = Number(riderEarningAmount);
+    if (kind === "deliveries" && (!Number.isFinite(earningAmount) || earningAmount <= 0)) {
+      setError("Enter a rider earning amount greater than 0 BDT.");
+      return;
+    }
+
     const id = recordId(riderModalItem);
 
     setRiderSaving(true);
@@ -593,7 +601,7 @@ export default function DeliveryWorkspace({
 
     try {
       if (kind === "deliveries") {
-        await deliveryAdminApi.deliveries.assignRider(id, selectedRiderId);
+        await deliveryAdminApi.deliveries.assignRider(id, selectedRiderId, earningAmount);
       } else {
         await deliveryAdminApi.shipping.assignRider(id, selectedRiderId);
       }
@@ -1752,6 +1760,23 @@ export default function DeliveryWorkspace({
             </div>
 
             <div className="space-y-4 p-5">
+              {kind === "deliveries" && (
+                <div>
+                  <label className={labelClass}>Rider earning amount (BDT)</label>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={riderEarningAmount}
+                    onChange={(event) => setRiderEarningAmount(event.target.value)}
+                    placeholder="Enter rider earning amount"
+                    className={inputClass}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    This amount will be added to rider earnings only after delivery is completed.
+                  </p>
+                </div>
+              )}
               <div>
                 <label className={labelClass}>Search active riders</label>
                 <div className="relative">
@@ -1861,7 +1886,7 @@ export default function DeliveryWorkspace({
               <button
                 type="button"
                 onClick={() => void confirmRiderAssignment()}
-                disabled={!selectedRiderId || riderSaving || ridersLoading}
+                disabled={!selectedRiderId || riderSaving || ridersLoading || (kind === "deliveries" && (!riderEarningAmount || Number(riderEarningAmount) <= 0))}
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
               >
                 {riderSaving && (

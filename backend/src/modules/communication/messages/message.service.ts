@@ -501,23 +501,18 @@ const assertCanMessage = async (
   });
 
   if (activeRiderSender) {
-    const [recipientOwner, recipientAdmin, recipientEmployee] =
-      await Promise.all([
-        Owner.exists({
-          userId: recipientId,
-          status: OWNER_STATUSES.ACTIVE,
-        }),
-        Admin.exists({
-          $or: [{ userId: recipientId }, { _id: recipientId }],
-          status: ADMIN_STATUSES.ACTIVE,
-        }),
-        Employee.exists({
-          userId: recipientId,
-          status: EMPLOYEE_STATUSES.ACTIVE,
-        }),
-      ]);
+    const [recipientOwner, recipientAdmin] = await Promise.all([
+      Owner.exists({
+        userId: recipientId,
+        status: OWNER_STATUSES.ACTIVE,
+      }),
+      Admin.exists({
+        $or: [{ userId: recipientId }, { _id: recipientId }],
+        status: ADMIN_STATUSES.ACTIVE,
+      }),
+    ]);
 
-    if (!recipientOwner && !recipientAdmin && !recipientEmployee) {
+    if (!recipientOwner && !recipientAdmin) {
       throw ApiError.forbidden(
         "Riders can only reply to active NOPTRIX administrative accounts.",
         { code: "RIDER_MESSAGE_RECIPIENT_FORBIDDEN" },
@@ -829,6 +824,54 @@ export const createMessage = async (
 
   const [messageWithNames] = await addMessageNames([message]);
   return messageWithNames;
+};
+
+export const createRiderSupportMessage = async (
+  riderId: string,
+  body: string,
+): Promise<MessageResponse> => {
+  const riderObjectId = validateObjectId(riderId, "rider ID");
+
+  const existingMessage = await Message.findOne({
+    $or: [
+      { senderId: riderObjectId },
+      { recipientId: riderObjectId },
+    ],
+    status: { $ne: MESSAGE_STATUSES.DELETED },
+  })
+    .sort({ createdAt: 1, _id: 1 })
+    .select("_id")
+    .exec();
+
+  if (existingMessage) {
+    return createMessageReply(existingMessage._id.toString(), riderId, [], body);
+  }
+
+  const owner = await Owner.findOne({
+    status: OWNER_STATUSES.ACTIVE,
+  }).select("userId").exec();
+
+  const admin = owner
+    ? null
+    : await Admin.findOne({
+        status: ADMIN_STATUSES.ACTIVE,
+      }).select("userId").exec();
+
+  const recipientId = owner?.userId ?? admin?.userId;
+
+  if (!recipientId) {
+    throw ApiError.forbidden(
+      "NOPTRIX Support is currently unavailable. Please try again later.",
+      { code: "SUPPORT_RECIPIENT_UNAVAILABLE" },
+    );
+  }
+
+  return createMessage(riderId, {
+    recipientId: recipientId.toString(),
+    subject: "NOPTRIX Support",
+    body,
+    priority: "NORMAL",
+  });
 };
 
 export const createMessageReply = async (
