@@ -5,6 +5,10 @@ import { ApiError } from "../../utils/ApiError";
 import { env } from "../../config/env";
 
 import { Rider } from "../riders/rider.model";
+import {
+  uploadBufferToCloudinary,
+  deleteFromCloudinary,
+} from "../../services/cloudinary.service";
 
 import {
   getAuthenticatedRiderId,
@@ -270,6 +274,7 @@ export const getMe = asyncHandler(
       );
     }
 
+
     res.status(200).json({
       success: true,
       message: "Rider profile retrieved successfully.",
@@ -278,6 +283,7 @@ export const getMe = asyncHandler(
         riderId: rider._id.toString(),
         name: rider.name,
         email: rider.email,
+        avatarUrl: rider.avatarUrl,
         phone: rider.phone,
         accountType: "RIDER",
         role: "RIDER",
@@ -322,6 +328,92 @@ export const changePassword = asyncHandler(
       success: true,
       message:
         "Rider password changed successfully. Please log in again.",
+    });
+  },
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| Upload / Replace Rider Profile Picture
+|--------------------------------------------------------------------------
+*/
+
+export const uploadMyRiderAvatarController = asyncHandler(
+  async (req: Request, res: Response) => {
+    const riderId = getAuthenticatedRiderId(req);
+
+    const rider = await Rider.findById(riderId)
+      .select("avatarUrl avatarPublicId")
+      .exec();
+
+    if (!rider) {
+      throw ApiError.notFound("Rider profile was not found.");
+    }
+
+    if (!req.file) {
+      throw ApiError.badRequest("Profile picture is required.");
+    }
+
+    if (!req.file.buffer || req.file.buffer.length === 0) {
+      throw ApiError.badRequest("Uploaded profile picture is empty.");
+    }
+
+    const uploaded = await uploadBufferToCloudinary(
+      {
+        buffer: req.file.buffer,
+        filename: req.file.originalname,
+      },
+      {
+        folder: "noptrix/riders/avatars",
+        resourceType: "image",
+        overwrite: false,
+        useUniqueFilename: true,
+        invalidate: true,
+        transformation: [
+          {
+            width: 800,
+            height: 800,
+            crop: "limit",
+            quality: "auto",
+            fetch_format: "auto",
+          },
+        ],
+      },
+    );
+
+    const oldPublicId = rider.avatarPublicId;
+
+    try {
+      rider.avatarUrl = uploaded.secureUrl;
+      rider.avatarPublicId = uploaded.publicId;
+      await rider.save();
+    } catch (error) {
+      try {
+        await deleteFromCloudinary(uploaded.publicId, "image");
+      } catch {
+        // Preserve the original database error.
+      }
+      throw error;
+    }
+
+    if (oldPublicId && oldPublicId !== uploaded.publicId) {
+      try {
+        await deleteFromCloudinary(oldPublicId, "image");
+      } catch {
+        // Avatar update remains successful if old asset cleanup fails.
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Rider profile picture updated successfully.",
+      data: {
+        avatar: {
+          avatarUrl: uploaded.secureUrl,
+          avatarPublicId: uploaded.publicId,
+        },
+      },
     });
   },
 );

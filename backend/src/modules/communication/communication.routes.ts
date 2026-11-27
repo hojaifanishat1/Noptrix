@@ -4,6 +4,7 @@ import messageRoutes from "./messages/message.routes";
 import riderMessageRoutes from "./messages/rider-message.routes";
 import announcementRoutes from "./announcements/announcement.routes";
 import broadcastRoutes from "./broadcast.routes";
+import riderAnnouncementRoutes from "./announcements/rider-announcement.routes";
 
 const router = Router();
 
@@ -25,6 +26,7 @@ const router = Router();
 router.use("/messages/rider", riderMessageRoutes);
 router.use("/messages", messageRoutes);
 
+router.use("/announcements/rider", riderAnnouncementRoutes);
 router.use("/announcements", announcementRoutes);
 
 router.use("/broadcast", broadcastRoutes);

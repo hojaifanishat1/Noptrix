@@ -143,6 +143,17 @@ const announcementSchema = new Schema<IAnnouncementDocument>(
       index: true,
     },
 
+    targetRiderIds: {
+      type: [
+        {
+          type: Schema.Types.ObjectId,
+          ref: "Rider",
+        },
+      ],
+      default: undefined,
+      index: true,
+    },
+
     status: {
       type: String,
       enum: {

@@ -8,6 +8,8 @@ import {
   riderAuth,
 } from "../../middlewares/riderAuth.middleware";
 
+import { uploadSingleImage } from "../../middlewares/upload.middleware";
+
 import {
   login,
   verifyLogin,
@@ -16,6 +18,7 @@ import {
   logout,
   getMe,
   changePassword,
+  uploadMyRiderAvatarController,
 } from "./rider-auth.controller";
 
 import {
@@ -51,6 +54,13 @@ router.post(
   "/refresh",
   validate(riderRefreshTokenSchema),
   refreshToken,
+);
+
+router.post(
+  "/me/avatar",
+  riderAuth,
+  uploadSingleImage,
+  uploadMyRiderAvatarController,
 );
 
 router.get(

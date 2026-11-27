@@ -143,6 +143,7 @@ export default function AdminAnnouncementsPage() {
     const [form, setForm] = useState<CreateAnnouncementInput>(EMPTY_FORM);
     const [roleIds, setRoleIds] = useState("");
     const [userIds, setUserIds] = useState("");
+    const [riderIds, setRiderIds] = useState("");
     const [scheduledAt, setScheduledAt] = useState("");
     const [expiresAt, setExpiresAt] = useState("");
 
@@ -221,6 +222,13 @@ export default function AdminAnnouncementsPage() {
                     .filter(Boolean);
             }
 
+            if (form.targetType === "RIDERS") {
+                payload.targetRiderIds = riderIds
+                    .split(/[\s,]+/)
+                    .map((id) => id.trim())
+                    .filter(Boolean);
+            }
+
             if (scheduledAt) {
                 payload.scheduledAt = new Date(scheduledAt).toISOString();
             }
@@ -234,6 +242,7 @@ export default function AdminAnnouncementsPage() {
             setForm(EMPTY_FORM);
             setRoleIds("");
             setUserIds("");
+            setRiderIds("");
             setScheduledAt("");
             setExpiresAt("");
             setShowCreate(false);
@@ -403,7 +412,11 @@ export default function AdminAnnouncementsPage() {
                                                     ? "All administrators"
                                                     : value === "ROLES"
                                                         ? "Specific roles"
-                                                        : "Specific users"}
+                                                        : value === "USERS"
+                                                            ? "Specific users"
+                                                            : value === "ALL_RIDERS"
+                                                                ? "All active riders"
+                                                                : "Specific riders"}
                                             </option>
                                         ))}
                                     </Select>
@@ -429,6 +442,18 @@ export default function AdminAnnouncementsPage() {
                                             value={userIds}
                                             onChange={(event) => setUserIds(event.target.value)}
                                             placeholder="MongoDB IDs, separated by commas"
+                                        />
+                                    </label>
+                                )}
+
+                                {form.targetType === "RIDERS" && (
+                                    <label className="space-y-2 text-sm font-medium">
+                                        Rider IDs
+                                        <Input
+                                            required
+                                            value={riderIds}
+                                            onChange={(event) => setRiderIds(event.target.value)}
+                                            placeholder="Rider MongoDB IDs, separated by commas"
                                         />
                                     </label>
                                 )}

@@ -41,6 +41,8 @@ export type AnnouncementPriority =
 
 export const ANNOUNCEMENT_TARGET_TYPES = {
   ALL_ADMINS: "ALL_ADMINS",
+  ALL_RIDERS: "ALL_RIDERS",
+  RIDERS: "RIDERS",
   ROLES: "ROLES",
   USERS: "USERS",
 } as const;
@@ -82,6 +84,7 @@ export interface IAnnouncement {
 
   targetRoleIds?: Types.ObjectId[];
   targetUserIds?: Types.ObjectId[];
+  targetRiderIds?: Types.ObjectId[];
 
   status: AnnouncementStatus;
 

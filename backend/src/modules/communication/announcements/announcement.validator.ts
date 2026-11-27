@@ -51,7 +51,7 @@ export const createAnnouncementSchema = z
 
     priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).default("NORMAL"),
 
-    targetType: z.enum(["ALL_ADMINS", "ROLES", "USERS"]),
+    targetType: z.enum(["ALL_ADMINS", "ALL_RIDERS", "RIDERS", "ROLES", "USERS"]),
 
     targetRoleIds: z
       .array(objectIdSchema)
@@ -61,6 +61,11 @@ export const createAnnouncementSchema = z
     targetUserIds: z
       .array(objectIdSchema)
       .max(500, "An announcement cannot target more than 500 users.")
+      .optional(),
+
+    targetRiderIds: z
+      .array(objectIdSchema)
+      .max(500, "An announcement cannot target more than 500 riders.")
       .optional(),
 
     scheduledAt: z.coerce.date().optional(),
@@ -123,6 +128,44 @@ export const createAnnouncementSchema = z
     }
 
     if (
+      data.targetType === "RIDERS" &&
+      (!data.targetRiderIds || data.targetRiderIds.length === 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["targetRiderIds"],
+        message: "At least one target rider is required.",
+      });
+    }
+
+    if (
+      (data.targetType === "ALL_ADMINS" || data.targetType === "ALL_RIDERS") &&
+      (data.targetRoleIds?.length || data.targetUserIds?.length || data.targetRiderIds?.length)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["targetType"],
+        message: "All-target announcements cannot contain specific targets.",
+      });
+    }
+
+    if (data.targetType === "ALL_RIDERS" && (data.targetRoleIds?.length || data.targetUserIds?.length)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["targetType"],
+        message: "ALL_RIDERS cannot contain administrator targets.",
+      });
+    }
+
+    if (data.targetType === "RIDERS" && (data.targetRoleIds?.length || data.targetUserIds?.length)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["targetType"],
+        message: "Rider-targeted announcements cannot contain administrator targets.",
+      });
+    }
+
+    if (
       data.scheduledAt &&
       data.expiresAt &&
       data.expiresAt <= data.scheduledAt
@@ -159,7 +202,7 @@ export const updateAnnouncementSchema = z
 
     priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).optional(),
 
-    targetType: z.enum(["ALL_ADMINS", "ROLES", "USERS"]).optional(),
+    targetType: z.enum(["ALL_ADMINS", "ALL_RIDERS", "RIDERS", "ROLES", "USERS"]).optional(),
 
     targetRoleIds: z
       .array(objectIdSchema)
@@ -169,6 +212,11 @@ export const updateAnnouncementSchema = z
     targetUserIds: z
       .array(objectIdSchema)
       .max(500, "An announcement cannot target more than 500 users.")
+      .optional(),
+
+    targetRiderIds: z
+      .array(objectIdSchema)
+      .max(500, "An announcement cannot target more than 500 riders.")
       .optional(),
 
     scheduledAt: z.coerce.date().optional(),
@@ -181,6 +229,41 @@ export const updateAnnouncementSchema = z
       .optional(),
   })
   .superRefine((data, ctx) => {
+    if (data.targetType === "RIDERS" && data.targetRiderIds && data.targetRiderIds.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["targetRiderIds"],
+        message: "At least one target rider is required.",
+      });
+    }
+
+    if (
+      (data.targetType === "ALL_ADMINS" || data.targetType === "ALL_RIDERS") &&
+      (data.targetRoleIds?.length || data.targetUserIds?.length || data.targetRiderIds?.length)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["targetType"],
+        message: "All-target announcements cannot contain specific targets.",
+      });
+    }
+
+    if (data.targetType === "RIDERS" && (data.targetRoleIds?.length || data.targetUserIds?.length)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["targetType"],
+        message: "Rider-targeted announcements cannot contain administrator targets.",
+      });
+    }
+
+    if (data.targetType === "ALL_RIDERS" && (data.targetRoleIds?.length || data.targetUserIds?.length)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["targetType"],
+        message: "ALL_RIDERS cannot contain administrator targets.",
+      });
+    }
+
     if (
       data.scheduledAt &&
       data.expiresAt &&
@@ -237,7 +320,7 @@ export const announcementListQuerySchema = z.object({
 
   priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).optional(),
 
-  targetType: z.enum(["ALL_ADMINS", "ROLES", "USERS"]).optional(),
+  targetType: z.enum(["ALL_ADMINS", "ALL_RIDERS", "RIDERS", "ROLES", "USERS"]).optional(),
 
   search: z.string().trim().max(100).optional(),
 });

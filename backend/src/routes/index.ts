@@ -37,6 +37,7 @@ import riderRoutes from "../modules/riders/rider.routes";
 import riderInvitationRoutes from "../modules/rider-invitations/rider-invitation.routes";
 import trackingRoutes from "../modules/tracking/tracking.routes";
 import riderAuthRoutes from "../modules/rider-auth/rider-auth.routes";
+import riderSettingsRoutes from "../modules/rider-settings/rider-settings.routes";
 import riderEarningRoutes from "../modules/rider-earnings/riderEarning.routes";
 import riderPayoutRoutes from "../modules/rider-payouts/riderPayout.routes";
 import sellerAuthRoutes from "../modules/seller-auth/seller-auth.routes";
@@ -178,6 +179,7 @@ router.use("/employee-auth", employeeAuthRoutes);
 router.use("/admins", adminRoutes);
 
 router.use("/rider-auth", riderAuthRoutes);
+router.use("/rider-settings", riderSettingsRoutes);
 
 router.use("/seller-auth", sellerAuthRoutes);
 

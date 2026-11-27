@@ -3,6 +3,11 @@ import { Types } from "mongoose";
 import { Announcement, type IAnnouncementDocument } from "./announcement.model";
 
 import {
+  RiderAnnouncementRecipient,
+  type IRiderAnnouncementRecipient,
+} from "./rider-announcement-recipient.model";
+
+import {
   AnnouncementRecipient,
   type IAnnouncementRecipientDocument,
 } from "./announcement-recipient.model";
@@ -25,6 +30,8 @@ import { Role } from "../../roles/role.model";
 
 import { Owner } from "../../owners/owner.model";
 
+import { Rider } from "../../riders/rider.model";
+
 import { ApiError } from "../../../utils/ApiError";
 
 import {
@@ -46,6 +53,7 @@ export interface CreateAnnouncementServiceInput {
   targetType: AnnouncementTargetType;
   targetRoleIds?: string[];
   targetUserIds?: string[];
+  targetRiderIds?: string[];
   scheduledAt?: Date;
   expiresAt?: Date;
   attachments?: AnnouncementAttachment[];
@@ -58,6 +66,7 @@ export interface UpdateAnnouncementServiceInput {
   targetType?: AnnouncementTargetType;
   targetRoleIds?: string[];
   targetUserIds?: string[];
+  targetRiderIds?: string[];
   scheduledAt?: Date;
   expiresAt?: Date;
   attachments?: AnnouncementAttachment[];
@@ -284,6 +293,68 @@ const resolveTargetUserIds = async (
 
 /*
 |--------------------------------------------------------------------------
+| Resolve Target Riders
+|--------------------------------------------------------------------------
+*/
+
+const resolveTargetRiderIds = async (
+  targetType: AnnouncementTargetType,
+  targetRiderIds?: string[],
+): Promise<Types.ObjectId[]> => {
+  if (targetType === ANNOUNCEMENT_TARGET_TYPES.ALL_RIDERS) {
+    const riders = await Rider.find({ status: "ACTIVE" }).select("_id").lean();
+    return riders.map((rider) => rider._id);
+  }
+
+  if (targetType === ANNOUNCEMENT_TARGET_TYPES.RIDERS) {
+    const riderIds = (targetRiderIds ?? []).map((id) =>
+      validateObjectId(id, "Target rider ID"),
+    );
+
+    if (riderIds.length === 0) {
+      throw ApiError.badRequest("At least one target rider is required.");
+    }
+
+    const riders = await Rider.find({
+      _id: { $in: riderIds },
+      status: "ACTIVE",
+    }).select("_id").lean();
+
+    if (riders.length !== riderIds.length) {
+      throw ApiError.badRequest("One or more target riders are invalid or inactive.");
+    }
+
+    return riders.map((rider) => rider._id);
+  }
+
+  return [];
+};
+
+const createRiderRecipients = async (
+  announcementId: Types.ObjectId,
+  riderIds: Types.ObjectId[],
+): Promise<void> => {
+  if (riderIds.length === 0) return;
+
+  await RiderAnnouncementRecipient.bulkWrite(
+    riderIds.map((riderId) => ({
+      updateOne: {
+        filter: { announcementId, riderId },
+        update: {
+          $setOnInsert: {
+            announcementId,
+            riderId,
+            deliveredAt: new Date(),
+          },
+        },
+        upsert: true,
+      },
+    })),
+  );
+};
+
+/*
+|--------------------------------------------------------------------------
 | Create Recipients
 |--------------------------------------------------------------------------
 */
@@ -360,6 +431,10 @@ export const createAnnouncement = async (
       validateObjectId(id, "Target user ID"),
     ),
 
+    targetRiderIds: data.targetRiderIds?.map((id) =>
+      validateObjectId(id, "Target rider ID"),
+    ),
+
     status,
 
     scheduledAt,
@@ -376,9 +451,14 @@ export const createAnnouncement = async (
     data.targetRoleIds,
     data.targetUserIds,
   );
+  const targetRiderIds = await resolveTargetRiderIds(
+    data.targetType,
+    data.targetRiderIds,
+  );
 
   if (status === ANNOUNCEMENT_STATUSES.PUBLISHED) {
     await createRecipients(announcement._id, targetUserIds);
+    await createRiderRecipients(announcement._id, targetRiderIds);
   }
 
   /*
@@ -629,6 +709,11 @@ export const updateAnnouncement = async (
     );
 
     await createRecipients(announcement._id, targetUserIds);
+    const targetRiderIds = await resolveTargetRiderIds(
+      announcement.targetType,
+      announcement.targetRiderIds?.map((item) => item.toString()),
+    );
+    await createRiderRecipients(announcement._id, targetRiderIds);
   }
 
   return announcement;
@@ -693,6 +778,11 @@ export const publishAnnouncement = async (
   );
 
   await createRecipients(announcement._id, targetUserIds);
+  const targetRiderIds = await resolveTargetRiderIds(
+    announcement.targetType,
+    announcement.targetRiderIds?.map((item) => item.toString()),
+  );
+  await createRiderRecipients(announcement._id, targetRiderIds);
 
   if (announcement.expiresAt) {
     await scheduleAnnouncementExpiry(
@@ -1008,6 +1098,107 @@ export const publishScheduledAnnouncement = async (
   );
 
   await createRecipients(announcement._id, userIds);
+  const riderIds = await resolveTargetRiderIds(
+    announcement.targetType,
+    announcement.targetRiderIds?.map((id) => id.toString()),
+  );
+  await createRiderRecipients(announcement._id, riderIds);
 
   return announcement;
+};
+
+
+/*
+|--------------------------------------------------------------------------
+| Rider Recipient Inbox
+|--------------------------------------------------------------------------
+*/
+
+export interface RiderRecipientListServiceInput {
+  riderId: string;
+  page: number;
+  limit: number;
+  unreadOnly?: boolean;
+}
+
+export const getMyRiderAnnouncements = async (
+  input: RiderRecipientListServiceInput,
+): Promise<{
+  recipients: IRiderAnnouncementRecipient[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}> => {
+  const riderId = validateObjectId(input.riderId, "Rider ID");
+  const { page, limit, skip } = getPagination(input.page, input.limit);
+  const filter: Record<string, unknown> = { riderId };
+
+  if (input.unreadOnly) {
+    filter.readAt = { $exists: false };
+  }
+
+  const [recipients, total] = await Promise.all([
+    RiderAnnouncementRecipient.find(filter)
+      .populate("announcementId")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    RiderAnnouncementRecipient.countDocuments(filter),
+  ]);
+
+  return {
+    recipients,
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
+  };
+};
+
+export const getMyRiderAnnouncementById = async (
+  announcementId: string,
+  riderId: string,
+): Promise<IRiderAnnouncementRecipient> => {
+  const announcementObjectId = validateObjectId(announcementId, "Announcement ID");
+  const riderObjectId = validateObjectId(riderId, "Rider ID");
+
+  const recipient = await RiderAnnouncementRecipient.findOne({
+    announcementId: announcementObjectId,
+    riderId: riderObjectId,
+  }).populate("announcementId");
+
+  if (!recipient) {
+    throw ApiError.notFound("Announcement not found.");
+  }
+
+  return recipient;
+};
+
+export const markRiderAnnouncementAsRead = async (
+  announcementId: string,
+  riderId: string,
+): Promise<IRiderAnnouncementRecipient> => {
+  const recipient = await getMyRiderAnnouncementById(announcementId, riderId);
+
+  if (!recipient.readAt) {
+    recipient.readAt = new Date();
+    await recipient.save();
+  }
+
+  return recipient;
+};
+
+export const dismissRiderAnnouncement = async (
+  announcementId: string,
+  riderId: string,
+): Promise<IRiderAnnouncementRecipient> => {
+  const recipient = await getMyRiderAnnouncementById(announcementId, riderId);
+
+  if (!recipient.dismissedAt) {
+    recipient.dismissedAt = new Date();
+    await recipient.save();
+  }
+
+  return recipient;
 };

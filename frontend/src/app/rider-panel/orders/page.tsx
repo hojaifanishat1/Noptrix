@@ -231,7 +231,11 @@ export default function RiderOrdersPage() {
                       {order?.orderNumber || "Order details unavailable"}
                     </h2>
                     <p className="mt-1 text-xs text-slate-500">
-                      {order?._id || record.orderId}
+                      {order?._id ||
+                        (typeof record.orderId === "string"
+                          ? record.orderId
+                          : record.orderId?._id) ||
+                        "—"}
                     </p>
                   </div>
 

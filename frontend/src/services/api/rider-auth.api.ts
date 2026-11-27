@@ -85,6 +85,17 @@ export const riderAuthApi = {
         return response.data.data;
     },
 
+    async uploadAvatar(file: File): Promise<string> {
+        const formData = new FormData();
+        formData.append("image", file);
+
+        const response = await apiClient.post<
+            ApiResponse<{ avatar: { avatarUrl: string } }>
+        >("/rider-auth/me/avatar", formData);
+
+        return response.data.data.avatar.avatarUrl;
+    },
+
     async updateLocation(input: {
         latitude: number;
         longitude: number;

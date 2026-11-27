@@ -15,6 +15,8 @@ export const ANNOUNCEMENT_PRIORITIES = [
 
 export const ANNOUNCEMENT_TARGET_TYPES = [
     "ALL_ADMINS",
+    "ALL_RIDERS",
+    "RIDERS",
     "ROLES",
     "USERS",
 ] as const;
@@ -43,6 +45,7 @@ export interface Announcement {
     targetType: AnnouncementTargetType;
     targetRoleIds?: string[];
     targetUserIds?: string[];
+    targetRiderIds?: string[];
     status: AnnouncementStatus;
     createdBy?: string;
     updatedBy?: string;
@@ -78,6 +81,7 @@ export interface CreateAnnouncementInput {
     targetType: AnnouncementTargetType;
     targetRoleIds?: string[];
     targetUserIds?: string[];
+    targetRiderIds?: string[];
     scheduledAt?: string;
     expiresAt?: string;
     attachments?: AnnouncementAttachment[];

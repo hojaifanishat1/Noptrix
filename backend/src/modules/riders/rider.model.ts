@@ -26,6 +26,8 @@ export interface IRider extends Document {
   name: string;
 
   email: string;
+  avatarUrl?: string;
+  avatarPublicId?: string;
 
   phone?: string;
   password?: string;
@@ -129,6 +131,16 @@ const riderSchema = new Schema<IRider>(
       trim: true,
       lowercase: true,
       maxlength: 254,
+    },
+
+    avatarUrl: {
+      type: String,
+      trim: true,
+    },
+
+    avatarPublicId: {
+      type: String,
+      trim: true,
     },
 
     phone: {
